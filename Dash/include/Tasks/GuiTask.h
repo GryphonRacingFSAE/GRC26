@@ -1,4 +1,16 @@
 #ifndef GuiTask_H
 #define GuiTask_H
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
+#include <freertos/queue.h>
+
+typedef struct {
+    SemaphoreHandle_t* guiMutex;
+    QueueHandle_t*     dataQueue;
+} GuiTaskParameters;
+
+void GuiTask(void* pvParameters);
+
 #endif // GuiTask_H
