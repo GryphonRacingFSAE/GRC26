@@ -1,18 +1,18 @@
 #include <Arduino.h>
-#include <Wire.h>
-
-#define LV_CONF_INCLUDE_SIMPLE // Necessary for custom LVGL config
+// LVGL INCLUDES
+#define LV_CONF_INCLUDE_SIMPLE
 #include <lv_conf.h>
 #include <lvgl.h>
 
 #include <esp_display_panel.hpp>
 #include <drivers/lcd/esp_panel_lcd_st7262.hpp>
 
-// Pin definitions
+// LCD pins
 static constexpr int8_t LCD_DE    =  5;
 static constexpr int8_t LCD_VSYNC =  3;
 static constexpr int8_t LCD_HSYNC =  46;
 static constexpr int8_t LCD_PCLK  =  7;
+// RGB Data pins
 static constexpr int8_t LCD_R3    =  1;
 static constexpr int8_t LCD_R4    =  2;
 static constexpr int8_t LCD_R5    =  42;
@@ -30,23 +30,26 @@ static constexpr int8_t LCD_B5    =  18;
 static constexpr int8_t LCD_B6    =  17;
 static constexpr int8_t LCD_B7    =  10;
 
+
 static constexpr int16_t LCD_WIDTH  = 1024;
 static constexpr int16_t LCD_HEIGHT = 600;
-//8 Mhz pixel clock
+// 8 Mhz pixel clock
 static constexpr int32_t LCD_PCLK_HZ = 8 * 1000 * 1000;
 
 using namespace esp_panel::drivers;
 
+// GLOBAL OBJECTS 
 BusRGB *panel_bus = nullptr;
 LCD_ST7262 *panel_lcd = nullptr;
 
+// LVGL BUFFERS (In PSRAM) 
 #define DRAW_BUF_SIZE (LCD_WIDTH * 20)
 static lv_disp_draw_buf_t draw_buf;
 
 static lv_color_t *buf1 = nullptr;
 static lv_color_t *buf2 = nullptr;
 
-// display config
+// LVGL FLUSH CALLBACK 
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
     int w = (area->x2 - area->x1 + 1);
     int h = (area->y2 - area->y1 + 1);
@@ -58,15 +61,8 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);
-    Serial.println("Starting LVGL...");
 
-    // Backlight on 
-    Wire.begin(8, 9);
-    Wire.beginTransmission(0x24); Wire.write(0x24); Wire.write(0x00); Wire.endTransmission();
-    Wire.beginTransmission(0x24); Wire.write(0x38); Wire.write(0xFF); Wire.endTransmission();
-    delay(200);
-
+    // Bus config
     BusRGB::RefreshPanelPartialConfig refresh_config = {
         .pclk_hz = LCD_PCLK_HZ,
         .h_res = LCD_WIDTH,
@@ -96,7 +92,7 @@ void setup() {
     bus_config.refresh_panel = refresh_config;
     panel_bus = new BusRGB(bus_config);
 
-    // LCD config
+    // LCD Config
     panel_lcd = new LCD_ST7262(panel_bus, LCD_WIDTH, LCD_HEIGHT, 16, -1);
     if (!panel_lcd->init()) { Serial.println("LCD Init Failed"); while(1); }
     panel_lcd->reset();
@@ -104,7 +100,7 @@ void setup() {
 
     lv_init();
 
-    // Memory allocation
+    // Draw Buffer Allocation
     buf1 = (lv_color_t *)heap_caps_malloc(DRAW_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
     buf2 = (lv_color_t *)heap_caps_malloc(DRAW_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
     lv_disp_draw_buf_init(&draw_buf, buf1, buf2, DRAW_BUF_SIZE);
@@ -119,7 +115,7 @@ void setup() {
     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
 
 
-    // Test button
+    // Button (test)
     lv_obj_t *btn = lv_btn_create(lv_scr_act());
     lv_obj_align(btn, LV_ALIGN_CENTER, 0, 0);
     lv_obj_t *label = lv_label_create(btn);
@@ -142,5 +138,5 @@ void setup() {
 
 void loop() {
     lv_timer_handler(); 
-    delay(5);           
+    delay(1);           
 }
