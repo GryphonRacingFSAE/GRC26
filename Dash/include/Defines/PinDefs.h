@@ -25,5 +25,8 @@ static constexpr int8_t LCD_B4    =  38;
 static constexpr int8_t LCD_B5    =  18;
 static constexpr int8_t LCD_B6    =  17;
 static constexpr int8_t LCD_B7    =  10;
+// LED PINS
+// NOTE: These pins are connected to RS485 breakout on the board but will be used for the LED
+static constexpr int8_t LED_DATA_PIN = 43;
 
 #endif // PIN_DEFS_H
