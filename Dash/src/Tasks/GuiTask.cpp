@@ -75,10 +75,29 @@ void GuiTask(void* pvParameters) {
     // 3. Create UI
     if (xSemaphoreTake(gui_mutex, portMAX_DELAY)) {
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
+
+        // static inline lv_color_t lv_color_make(uint8_t r, uint8_t b, uint8_t g)
+        // GOON MACHINE READY
         lv_obj_t* btn = lv_btn_create(lv_scr_act());
+        lv_obj_set_style_bg_color(btn, lv_color_make(148, 0x00, 211), 0);
         lv_obj_align(btn, LV_ALIGN_CENTER, 0, 0);
         lv_obj_t* label = lv_label_create(btn);
         lv_label_set_text(label, "GOON MACHINE READY");
+
+        // GOON BUTTON
+        lv_obj_t* goon_btn = lv_btn_create(lv_scr_act());
+        lv_obj_set_style_bg_color(goon_btn, lv_color_make(0x00, 0xFF, 0x00), 0);
+        lv_obj_align(goon_btn, LV_ALIGN_CENTER, -100, 100);
+        lv_obj_t* goon_label = lv_label_create(goon_btn);
+        lv_label_set_text(goon_label, "GOON NOW !");
+
+        // NO GOON BUTTON
+        lv_obj_t* no_goon_btn = lv_btn_create(lv_scr_act());
+        lv_obj_set_style_bg_color(no_goon_btn, lv_color_make(0xFF, 0x00, 0x00), 0);
+        lv_obj_align(no_goon_btn, LV_ALIGN_CENTER, 100, 100);
+        lv_obj_t* no_goon_label = lv_label_create(no_goon_btn);
+        lv_label_set_text(no_goon_label, "NO GOON");
+
         xSemaphoreGive(gui_mutex);
     }
     
