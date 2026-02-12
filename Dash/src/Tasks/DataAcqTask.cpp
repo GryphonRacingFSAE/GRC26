@@ -14,7 +14,8 @@ void DataAcqTask(void* pvParameters) {
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         Serial.println("Data Acquisition Task");
-        // TODO: Read CAN Bus / Sensors here
-        // xQueueSend(*params->dataQueue, &myPacket, 0);
+        // TODO: Read CAN data
+        // TODO: Store data in the struct 
+        // MAKE SURE TO USE A SEMAPHORE BEFORE WRITING TO THE STRUCT  
     }
 }
