@@ -6,6 +6,7 @@
 #include <freertos/queue.h>
 #include <stdint.h>
 #include <freertos/semphr.h>
+#include <stdbool.h>
 
 typedef struct {
     SemaphoreHandle_t* guiMutex;
@@ -34,7 +35,7 @@ typedef struct ecuData
     float coolantTempC;
 
     //0x536
-    float oilPressureKpa;
+    bool oilPressureWarning; //true = low/no pressure
     float oilTempC;
 
 } ecuData;
