@@ -4,6 +4,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include <stdint.h>
+#include <freertos/semphr.h>
 
 typedef struct {
     SemaphoreHandle_t* guiMutex;
@@ -17,6 +19,24 @@ typedef struct ecuData
 {
     // Add variables names in here 
     // ex: uint16_t rpm;
+
+    //0x520
+    uint16_t rpm; 
+    float throttlePercent;
+
+    //0x522
+    float vehicleSpeedKph;
+
+    //0x523
+    float wheelSpeedDrivenKph;
+
+    //0x530
+    float coolantTempC;
+
+    //0x536
+    float oilPressureKpa;
+    float oilTempC;
+
 } ecuData;
 
 #endif // DATA_ACQ_TASK_H
