@@ -1,0 +1,54 @@
+VERSION "Sep 29, 2020"
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: MaxxECU
+
+CM_ BU_ MaxxECU "MINIMAL DBC for dash: EngineSpeed, ThrottlePos, VehicleSpeed, CoolantTemp, Oil Pressure, Oil temperature, Wheel Speed";
+
+BO_ 1312 MSG_0x520: 8 MaxxECU
+ SG_ EngineSpeed : 0|16@1+ (1,0) [0|65535] "rpm" Vector__XXX
+ SG_ ThrottlePos : 16|16@1+ (0.1,0) [0|100] "fraction:%" Vector__XXX
+
+BO_ 1315 MSG_0x523: 8 MaxxECU
+ SG_ WheelSpeedAvgDriven : 16|16@1+ (0.1,0) [0|6553.5] "speed:km/h" Vector__XXX
+
+BO_ 1314 MSG_0x522: 8 MaxxECU
+ SG_ VehicleSpeed : 48|16@1+ (0.1,0) [0|6553.5] "speed:km/h" Vector__XXX
+
+BO_ 1328 MSG_0x530: 8 MaxxECU
+ SG_ CoolantTemp : 48|16@1+ (0.1,0) [0|6553.5] "temperature:C" Vector__XXX
+
+BO_ 1334 MSG_0x536: 8 MaxxECU
+ SG_ Engine_Oil_Pressure : 32|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ Engine_Oil_Temperature : 48|16@1- (0.1,0) [-3276.8|3276.7] "temperature:C" Vector__XXX
