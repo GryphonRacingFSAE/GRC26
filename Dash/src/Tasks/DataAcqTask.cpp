@@ -22,64 +22,88 @@ void DataAcqTask(void* pvParameters) {
 
             switch (rx_msg.identifier) {
 
-            case 0x0A2: {   // Motor Controller Temps
+case 0x520: {  // RPM + Throttle
 
-                int16_t hot_spot_temp =
-                    (int16_t)((rx_msg.data[3] << 8) | rx_msg.data[2]);
+    uint16_t raw_rpm =
+        (rx_msg.data[1] << 8) | rx_msg.data[0];
 
-                int16_t coolant_temp =
-                    (int16_t)((rx_msg.data[1] << 8) | rx_msg.data[0]);
+    uint16_t raw_throttle =
+        (rx_msg.data[3] << 8) | rx_msg.data[2];
 
-                if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
-                    params->sharedData->motor_controller_temp = hot_spot_temp;
-                    params->sharedData->coolant_temp = coolant_temp;
-                    xSemaphoreGive(params->dataMutex);
-                }
+    if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
 
-                break;
-            }
+        params->sharedData->rpm = raw_rpm;
+        params->sharedData->throttlePercent = raw_throttle * 0.1f; // adjust scale if needed
 
-            case 0x0A7: {   // DC Bus Voltage
+        xSemaphoreGive(params->dataMutex);
+    }
 
-                int16_t dc_bus_voltage =
-                    (int16_t)((rx_msg.data[1] << 8) | rx_msg.data[0]);
+    break;
+}
 
-                if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
-                    params->sharedData->tractive_voltage = dc_bus_voltage;
-                    xSemaphoreGive(params->dataMutex);
-                }
+case 0x522: {  // Vehicle Speed
 
-                break;
-            }
+    uint16_t raw_speed =
+        (rx_msg.data[1] << 8) | rx_msg.data[0];
 
-            case 0x0B0: {   // Motor Speed
+    if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
 
-                int16_t motor_speed =
-                    (int16_t)((rx_msg.data[3] << 8) | rx_msg.data[2]);
+        params->sharedData->vehicleSpeedKph = raw_speed * 0.01f; // adjust scale
 
-                if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
-                    params->sharedData->motor_speed = motor_speed;
-                    xSemaphoreGive(params->dataMutex);
-                }
+        xSemaphoreGive(params->dataMutex);
+    }
 
-                break;
-            }
+    break;
+}
 
-            case 0x0E0: {   // BMS Max Temp
+case 0x523: {  // Driven Wheel Speed
 
-                int8_t max_temp = (int8_t)rx_msg.data[0];
+    uint16_t raw_wheel_speed =
+        (rx_msg.data[1] << 8) | rx_msg.data[0];
 
-                if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
-                    params->sharedData->bms_max_temp = max_temp;
-                    xSemaphoreGive(params->dataMutex);
-                }
+    if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
 
-                break;
-            }
+        params->sharedData->wheelSpeedDrivenKph = raw_wheel_speed * 0.01f;
 
-            default:
-                break;
-            }
+        xSemaphoreGive(params->dataMutex);
+    }
+
+    break;
+}
+
+case 0x530: {  // Coolant Temp
+
+    int16_t raw_coolant =
+        (rx_msg.data[1] << 8) | rx_msg.data[0];
+
+    if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
+
+        params->sharedData->coolantTempC = raw_coolant * 0.1f;
+
+        xSemaphoreGive(params->dataMutex);
+    }
+
+    break;
+}
+
+case 0x536: {  // Oil Pressure (bool) + Oil Temp
+
+    bool oil_pressure_flag = (rx_msg.data[0] & 0x01);
+
+    int16_t raw_temp =
+        (rx_msg.data[3] << 8) | rx_msg.data[2];
+
+    if (xSemaphoreTake(params->dataMutex, portMAX_DELAY) == pdTRUE) {
+
+        params->sharedData->oilPressureKpa = oil_pressure_flag;
+        params->sharedData->oilTempC = raw_temp * 0.1f;
+
+        xSemaphoreGive(params->dataMutex);
+    }
+
+    break;
+}
+}
         }
     }
 }

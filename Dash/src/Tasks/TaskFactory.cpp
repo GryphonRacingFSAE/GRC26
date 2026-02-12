@@ -1,14 +1,12 @@
 #include <TaskFactory.h>
 #include <GuiTask.h>
-#include <DataAcqTask.h>
 #include <PeripheralTask.h>
 #include <Arduino.h>
-#include <DashData.h>
+#include <DataAcqTask.h>
 #include "driver/twai.h"
 
 // Static Handles (Private)
 static SemaphoreHandle_t guiMutexHandle;
-static QueueHandle_t     dataQueueHandle;
 static SemaphoreHandle_t dataMutexHandle;
 
 static TaskHandle_t guiTaskHandle = NULL;
@@ -16,7 +14,7 @@ static TaskHandle_t dataTaskHandle = NULL;
 static TaskHandle_t periphTaskHandle = NULL;
 
 // Static Parameters
-static DashData sharedData;
+static ecuData sharedData;
 static GuiTaskParameters      guiParams;
 static DataAcqTaskParameters  dataParams;
 static PeripheralTaskParameters periphParams;
@@ -45,13 +43,10 @@ if (twai_start() == ESP_OK) {
     // 1. Objects
     guiMutexHandle = xSemaphoreCreateMutex();
     dataMutexHandle = xSemaphoreCreateMutex();
-    dataQueueHandle = xQueueCreate(10, sizeof(int)); // Update sizeof() later
 
     // 2. Params
     guiParams.guiMutex = &guiMutexHandle;
-    guiParams.dataQueue = &dataQueueHandle;
     
-    dataParams.dataQueue = &dataQueueHandle;
     dataParams.dataMutex = dataMutexHandle;
     dataParams.sharedData = &sharedData;
     

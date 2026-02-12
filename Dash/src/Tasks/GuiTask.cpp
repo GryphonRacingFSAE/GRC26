@@ -2,6 +2,7 @@
 #include <PinDefs.h>
 #include <Arduino.h>
 #include <Wire.h>
+#include <DataAcqTask.h>
 
 // LVGL Includes
 #define LV_CONF_INCLUDE_SIMPLE
@@ -31,6 +32,8 @@ static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t
 void GuiTask(void* pvParameters) {
     GuiTaskParameters* params = (GuiTaskParameters*)pvParameters;
     SemaphoreHandle_t gui_mutex = *params->guiMutex;
+    SemaphoreHandle_t data_mutex = params->dataMutex;
+    ecuData* sharedData = params->sharedData;
 
     Serial.println("[GUI] Init Started");
 
@@ -91,9 +94,22 @@ void GuiTask(void* pvParameters) {
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-        if (xSemaphoreTake(gui_mutex, 0) == pdTRUE) {
-            Serial.println("GUI Task");
+        // Read shared ECU data safely
+        ecuData localCopy;
+        if (xSemaphoreTake(data_mutex, portMAX_DELAY) == pdTRUE) {
+            localCopy = *sharedData;
+            xSemaphoreGive(data_mutex);
+        }
+
+        // GUI update
+        if (xSemaphoreTake(gui_mutex, portMAX_DELAY) == pdTRUE) {
+
+            // Example debug output
+            Serial.print("RPM: ");
+            Serial.println(localCopy.rpm);
+
             lv_timer_handler();
+
             xSemaphoreGive(gui_mutex);
         }
     }
