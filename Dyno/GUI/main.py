@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
 from PyQt6.QtCore import QTimer
 
 # Set to false during norm ops
-RunDemo = True
+RunDemo = False
 
 class DynoApp(QMainWindow):
     def __init__(self):
@@ -36,7 +36,7 @@ class DynoApp(QMainWindow):
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.clicked.connect(self.toggle_connection)
 
-        self.filename_input = QLineEdit("Run_01")
+        self.filename_input = QLineEdit("Enter File Name")
         
         top_bar.addWidget(QLabel("COM Port:"))
         top_bar.addWidget(self.port_selector)
@@ -58,8 +58,8 @@ class DynoApp(QMainWindow):
         self.plot_widget.addLegend(offset=(10, 10))
         layout.addWidget(self.plot_widget)
         
-        # Give the plot some breathing room so labels don't get cut off
         self.plot_widget.plotItem.layout.setContentsMargins(10, 10, 30, 10)
+        self.plot_widget.showGrid(x=True, y=True, alpha=0.7)
         
         # Main ViewBox (Left Axis) - Torque
         self.main_view = self.plot_widget.plotItem.vb   
@@ -79,7 +79,7 @@ class DynoApp(QMainWindow):
         self.hp_view.setMouseEnabled(x = False, y = False)  # Disable zoom
 
         # Add HP Curve to secondary view
-        self.hp_line = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), name="HP")
+        self.hp_line = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), name="Horesepower")
         self.hp_view.addItem(self.hp_line)
         
         self.legend = self.plot_widget.addLegend(offset=(10, 10))
@@ -97,8 +97,8 @@ class DynoApp(QMainWindow):
         # Bottom Control Bar (Start/Stop Run & Marker)
         # ---------------------------------------------------------
         bottom_bar = QHBoxLayout()
-        self.start_btn = QPushButton("Start Run")
-        self.stop_btn = QPushButton("Stop & Save Run")
+        self.start_btn  = QPushButton("Start Run")
+        self.stop_btn   = QPushButton("Stop & Save Run")
         self.marker_btn = QPushButton("Drop Marker")
         
         self.start_btn.clicked.connect(self.start_run)
@@ -153,7 +153,8 @@ class DynoApp(QMainWindow):
                     self.serial_port = serial.Serial(port, 115200, timeout=0.02)
                 self.connect_btn.setText("Disconnect")
             except Exception as e:
-                print(f"Failed to connect: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to connect to port {port}")
+                
         else:
             self.serial_port.close()
             self.serial_port = None
@@ -204,16 +205,16 @@ class DynoApp(QMainWindow):
         try:
             with open(filepath, mode='w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(["RPM", "Torque", "HP"])
-                for r, t, h in zip(self.rpm_data, self.torque_data, self.hp_data):
-                    writer.writerow([r, t, h])
+                writer.writerow(["Torque", "HP", "RPM"])
+                for t, h, r in zip(self.torque_data, self.hp_data, self.rpm_data):
+                    writer.writerow([t, h, r])
             
             if self.marker_events:
                 with open(marker_filepath, mode='w', newline='') as f:
                     writer = csv.writer(f)
-                    writer.writerow(["RPM", "Torque", "HP", "Note"])
+                    writer.writerow(["Torque", "HP", "RPM", "Note"])
                     for m in self.marker_events:
-                        writer.writerow([m["rpm"], m["torque"], m["hp"], "Marker Drop"])
+                        writer.writerow([m["torque"], m["hp"], m["rpm"], "Marker Drop"])
                         
             QMessageBox.information(self, "Success", f"Saved {len(self.torque_data)} samples to {filepath}")
             
