@@ -14,6 +14,19 @@
 
 using namespace esp_panel::drivers;
 
+// Counter state
+static lv_obj_t* counter_label = nullptr;
+static uint8_t counter_value = 0;  
+
+/**
+ * Timer callback to update the counter value and label text every 500ms 
+ * Testing LVGL timers and dynamic label updates. Will be used for periodic UI updates in the future.
+ */
+static void counter_timer_cb(lv_timer_t* timer) {
+    counter_value++;  
+    lv_label_set_text_fmt(counter_label, "%d", counter_value);
+} 
+
 // Private Hardware Handles
 static BusRGB* panel_bus = nullptr;
 static LCD_ST7262* panel_lcd = nullptr;
@@ -74,29 +87,16 @@ void GuiTask(void* pvParameters) {
 
     // 3. Create UI
     if (xSemaphoreTake(gui_mutex, portMAX_DELAY)) {
+        // // Screen init
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
 
-        // static inline lv_color_t lv_color_make(uint8_t r, uint8_t b, uint8_t g)
-        // GOON MACHINE READY
-        lv_obj_t* btn = lv_btn_create(lv_scr_act());
-        lv_obj_set_style_bg_color(btn, lv_color_make(148, 0x00, 211), 0);
-        lv_obj_align(btn, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_t* label = lv_label_create(btn);
-        lv_label_set_text(label, "GOON MACHINE READY");
+        counter_label = lv_label_create(lv_scr_act());
+        lv_label_set_text(counter_label, "0");
+        lv_obj_align(counter_label, LV_ALIGN_CENTER, 0, -150);  
+        lv_obj_set_style_text_font(counter_label, &lv_font_montserrat_48, 0);
+        lv_obj_set_style_text_color(counter_label, lv_color_white(), 0);
 
-        // GOON BUTTON
-        lv_obj_t* goon_btn = lv_btn_create(lv_scr_act());
-        lv_obj_set_style_bg_color(goon_btn, lv_color_make(0x00, 0xFF, 0x00), 0);
-        lv_obj_align(goon_btn, LV_ALIGN_CENTER, -100, 100);
-        lv_obj_t* goon_label = lv_label_create(goon_btn);
-        lv_label_set_text(goon_label, "GOON NOW !");
-
-        // NO GOON BUTTON
-        lv_obj_t* no_goon_btn = lv_btn_create(lv_scr_act());
-        lv_obj_set_style_bg_color(no_goon_btn, lv_color_make(0xFF, 0x00, 0x00), 0);
-        lv_obj_align(no_goon_btn, LV_ALIGN_CENTER, 100, 100);
-        lv_obj_t* no_goon_label = lv_label_create(no_goon_btn);
-        lv_label_set_text(no_goon_label, "NO GOON");
+        lv_timer_create(counter_timer_cb, 100, NULL);
 
         xSemaphoreGive(gui_mutex);
     }
