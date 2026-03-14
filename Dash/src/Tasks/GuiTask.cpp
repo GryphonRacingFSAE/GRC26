@@ -2,6 +2,8 @@
 #include <PinDefs.h>
 #include <Arduino.h>
 #include <Wire.h>
+#include <iostream>
+#include <algorithm>
 
 // LVGL Includes
 #define LV_CONF_INCLUDE_SIMPLE
@@ -14,18 +16,116 @@
 
 using namespace esp_panel::drivers;
 
-// Counter state
-static lv_obj_t* counter_label = nullptr;
-static uint8_t counter_value = 0;  
+// Global UI Labels
+static lv_obj_t* rpm_label = nullptr;
+static lv_obj_t* speed_label = nullptr;
+static lv_obj_t* throttle_label = nullptr;
+static lv_obj_t* coolantTemp_label = nullptr;
+static lv_obj_t* oilTemp_label = nullptr;
+
+// Global UI State
+static uint16_t rpm_value = 0;
+static uint8_t speed_value = 0;  
+static uint8_t throttle_value = 0;
+static float coolantTemp_value = 0;
+static float oilTemp_value = 0;
 
 /**
- * Timer callback to update the counter value and label text every 500ms 
+ * Car Numerical Value Callback Ui:
+ * Timer callback to update the counter value and label text every 100ms
  * Testing LVGL timers and dynamic label updates. Will be used for periodic UI updates in the future.
+ * Ignore stuff like "%8d", it's just for formatting the text to look nice on the LCD.
  */
-static void counter_timer_cb(lv_timer_t* timer) {
-    counter_value++;  
-    lv_label_set_text_fmt(counter_label, "%d", counter_value);
+
+static void rpm_cb(lv_timer_t* timer) {
+    rpm_value += 1000;  
+    lv_label_set_text_fmt(rpm_label, "%d\n", rpm_value);
+}
+
+static void carspeed_cb(lv_timer_t* timer) {
+    speed_value++;  
+    lv_label_set_text_fmt(speed_label, "%d\n", speed_value);
 } 
+
+static void throttle_cb(lv_timer_t* timer) {
+    throttle_value++;  
+    lv_label_set_text_fmt(throttle_label, "Throttle pos: %8d%%", throttle_value);
+}
+
+static void coolantTemp_cb(lv_timer_t* timer) {
+    coolantTemp_value = 108.69;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Coolant Temp: \t%.2f°C", coolantTemp_value);
+    lv_label_set_text(coolantTemp_label, buf);
+
+    if(coolantTemp_value > 107.0f) {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFFCE1B), 0);
+    } else if(coolantTemp_value > 115.0f) {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFF2C2C), 0);
+    } else {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
+    }
+}
+
+static void oilTemp_cb(lv_timer_t* timer) {
+    oilTemp_value = 167.67;  
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Oil Temp: %18.2f°C", oilTemp_value);
+    lv_label_set_text(oilTemp_label, buf);
+
+    if(oilTemp_value > 110.0f) {
+        lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFFCE1B), 0);
+    } else if(oilTemp_value > 121.0f) {
+        lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFF2C2C), 0);
+    } else {
+        lv_obj_set_style_text_color(oilTemp_label, lv_color_white(), 0);
+    }
+}
+
+/**
+ * Car Label Format Callback Ui:
+ * Formatting the value displayed on LCD 
+ */
+
+static void rpm_format () {
+    rpm_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(rpm_label, "0");
+    lv_obj_align(rpm_label, LV_ALIGN_CENTER, 0, -250);  
+    lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(rpm_label, lv_color_white(), 0);
+}
+
+static void carspeed_format () {
+    speed_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(speed_label, "0");
+    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, -150);  
+    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_color(speed_label, lv_color_white(), 0);
+}
+
+static void throttle_format () {
+    throttle_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(throttle_label, "0%");
+    lv_obj_align(throttle_label, LV_ALIGN_LEFT_MID, 50, 0);  
+    lv_obj_set_style_text_font(throttle_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(throttle_label, lv_color_white(), 0);
+}
+
+static void coolantTemp_format () {
+    coolantTemp_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(coolantTemp_label, "0°C");
+    lv_obj_align(coolantTemp_label, LV_ALIGN_LEFT_MID, 50, 50);  
+    lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
+}
+
+static void oilTemp_format () {
+    oilTemp_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(oilTemp_label, "0°C");
+    lv_obj_align(oilTemp_label, LV_ALIGN_LEFT_MID, 50, 100);  
+    lv_obj_set_style_text_font(oilTemp_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(oilTemp_label, lv_color_white(), 0);
+}
 
 // Private Hardware Handles
 static BusRGB* panel_bus = nullptr;
@@ -89,14 +189,17 @@ void GuiTask(void* pvParameters) {
     if (xSemaphoreTake(gui_mutex, portMAX_DELAY)) {
         // // Screen init
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
+        carspeed_format();
+        rpm_format();
+        throttle_format();
+        coolantTemp_format();
+        oilTemp_format();
 
-        counter_label = lv_label_create(lv_scr_act());
-        lv_label_set_text(counter_label, "0");
-        lv_obj_align(counter_label, LV_ALIGN_CENTER, 0, -150);  
-        lv_obj_set_style_text_font(counter_label, &lv_font_montserrat_48, 0);
-        lv_obj_set_style_text_color(counter_label, lv_color_white(), 0);
-
-        lv_timer_create(counter_timer_cb, 100, NULL);
+        lv_timer_create(rpm_cb, 500, NULL);
+        lv_timer_create(carspeed_cb, 1000, NULL);
+        lv_timer_create(throttle_cb, 500, NULL);
+        lv_timer_create(coolantTemp_cb, 2000, NULL);
+        lv_timer_create(oilTemp_cb, 2000, NULL);
 
         xSemaphoreGive(gui_mutex);
     }
