@@ -1,14 +1,24 @@
 #ifndef DYNO_DATA_H
 #define DYNO_DATA_H
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
+#include <Arduino.h>
+
+typedef struct
+{
+    int torque;
+    int horsepower;
+    int rpm;
+} DynoData;
 
 typedef struct 
 {
-    QueueHandle_t* dataQueue;
+    QueueHandle_t* inputQueue;
+    QueueHandle_t* outputQueue;
 } DynoDataTaskParameters;
+
+extern QueueHandle_t xCanToDynoQueue;
+extern QueueHandle_t xDynoToOutputsQueue;
+
 
 void DynoDataTask(void* pvParameters);
 

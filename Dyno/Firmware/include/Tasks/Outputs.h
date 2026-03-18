@@ -1,13 +1,11 @@
 #ifndef OUTPUTS_H
 #define OUTPUTS_H
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
+#include "DynoData.h" 
 
 typedef struct 
 {
-    QueueHandle_t* dataQueue;
+    QueueHandle_t* dynoQueue;  
 } OutputsTaskParameters;
 
 void OutputsTask(void* pvParameters);

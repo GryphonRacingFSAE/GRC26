@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <TaskFactory.h>
 
 // 1D Lookup Table (LUT) modeling a 600cc engine torque curve
 const int MAP_POINTS = 10;
@@ -27,29 +28,32 @@ int CalculateHorsePower(float torque, float rpm) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
+  delay(2000);
+  Serial.println("[Setup] Initializing...");
+  createTasks();
 }
 
 void loop() {
-  int base_torque = GetTorqueFromMap(current_rpm);
+  // int base_torque = GetTorqueFromMap(current_rpm);
   
-  int actual_torque = base_torque * throttle_position;
+  // int actual_torque = base_torque * throttle_position;
   
-  int load_torque = (current_rpm * current_rpm) * 0.00000025; 
-  load_torque += 5.0; 
+  // int load_torque = (current_rpm * current_rpm) * 0.00000025; 
+  // load_torque += 5.0; 
   
-  int net_torque = actual_torque - load_torque;
+  // int net_torque = actual_torque - load_torque;
   
-  int rpm_change = net_torque * 15.0 * 0.02; // dt = 20ms
-  current_rpm += rpm_change;
+  // int rpm_change = net_torque * 15.0 * 0.02; // dt = 20ms
+  // current_rpm += rpm_change;
   
-  // RPM Hard limits
-  if (current_rpm < 1500.0) current_rpm = 1500.0; 
-  if (current_rpm > 15000.0) current_rpm -= 500;  
+  // // RPM Hard limits
+  // if (current_rpm < 1500.0) current_rpm = 1500.0; 
+  // if (current_rpm > 15000.0) current_rpm -= 500;  
   
-  int hp = CalculateHorsePower(actual_torque, current_rpm);
+  // int hp = CalculateHorsePower(actual_torque, current_rpm);
 
-  Serial.printf("%d,%d,%d\n", actual_torque, hp, current_rpm);
+  // Serial.printf("%d,%d,%d\n", actual_torque, hp, current_rpm);
   
-  delay(20); // 50Hz sample rate
+  // delay(20); // 50Hz sample rate
 }
