@@ -2,8 +2,6 @@
 #include <PinDefs.h>
 #include <Arduino.h>
 #include <Wire.h>
-#include <iostream>
-#include <algorithm>
 
 // LVGL Includes
 #define LV_CONF_INCLUDE_SIMPLE
@@ -14,21 +12,34 @@
 
 #define GUI_TASK_PERIOD_MS 5 // 200Hz Refresh
 
+LV_FONT_DECLARE(lv_font_montserrat_96);
+LV_FONT_DECLARE(lv_font_montserrat_140);
+
 using namespace esp_panel::drivers;
 
-// Global UI Labels
+// Labels to display CAN data
 static lv_obj_t* rpm_label = nullptr;
 static lv_obj_t* speed_label = nullptr;
 static lv_obj_t* throttle_label = nullptr;
 static lv_obj_t* coolantTemp_label = nullptr;
 static lv_obj_t* oilTemp_label = nullptr;
 
-// Global UI State
-static uint16_t rpm_value = 0;
-static uint8_t speed_value = 0;  
-static uint8_t throttle_value = 0;
-static float coolantTemp_value = 0;
-static float oilTemp_value = 0;
+// Miscs labels
+static lv_obj_t* rpm_ui = nullptr;
+static lv_obj_t* speed_ui = nullptr;
+static lv_obj_t* throttle_ui = nullptr;
+static lv_obj_t* coolantTemp_ui = nullptr; 
+static lv_obj_t* oilTemp_ui = nullptr;
+
+volatile uint16_t rpm_value DRAM_ATTR = 0;
+volatile uint8_t speed_value DRAM_ATTR = 0;  
+volatile uint8_t throttle_value DRAM_ATTR = 0;
+volatile int16_t coolantTemp_value DRAM_ATTR = 0;
+volatile int16_t oilTemp_value DRAM_ATTR = 0;
+
+// Global UI constant
+static constexpr int8_t marginX = 50;
+static constexpr int8_t marginY = 50;
 
 /**
  * Car Numerical Value Callback Ui:
@@ -39,44 +50,44 @@ static float oilTemp_value = 0;
 
 static void rpm_cb(lv_timer_t* timer) {
     rpm_value += 1000;  
-    lv_label_set_text_fmt(rpm_label, "%d\n", rpm_value);
+    lv_label_set_text_fmt(rpm_label, "%d", rpm_value);
 }
 
 static void carspeed_cb(lv_timer_t* timer) {
-    speed_value++;  
-    lv_label_set_text_fmt(speed_label, "%d\n", speed_value);
+    speed_value = 68;  
+    lv_label_set_text_fmt(speed_label, "%d", speed_value);
 } 
 
 static void throttle_cb(lv_timer_t* timer) {
-    throttle_value++;  
-    lv_label_set_text_fmt(throttle_label, "Throttle pos: %8d%%", throttle_value);
+    throttle_value = 67;  
+    lv_label_set_text_fmt(throttle_label, "%d%%", throttle_value);
 }
 
 static void coolantTemp_cb(lv_timer_t* timer) {
-    coolantTemp_value = 108.69;
-    char buf[32];
-    snprintf(buf, sizeof(buf), "Coolant Temp: \t%.2f°C", coolantTemp_value);
+    coolantTemp_value = 108;
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d°C", coolantTemp_value);
     lv_label_set_text(coolantTemp_label, buf);
 
-    if(coolantTemp_value > 107.0f) {
-        lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFFCE1B), 0);
-    } else if(coolantTemp_value > 115.0f) {
+    if(coolantTemp_value > 115) {
         lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFF2C2C), 0);
+    } else if(coolantTemp_value > 107) {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFFCE1B), 0);
     } else {
         lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
     }
 }
 
 static void oilTemp_cb(lv_timer_t* timer) {
-    oilTemp_value = 167.67;  
-    char buf[32];
-    snprintf(buf, sizeof(buf), "Oil Temp: %18.2f°C", oilTemp_value);
+    oilTemp_value = 167;  
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d°C", oilTemp_value);
     lv_label_set_text(oilTemp_label, buf);
 
-    if(oilTemp_value > 110.0f) {
-        lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFFCE1B), 0);
-    } else if(oilTemp_value > 121.0f) {
+    if(oilTemp_value > 121) {
         lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFF2C2C), 0);
+    } else if(oilTemp_value > 110) {
+        lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFFCE1B), 0);
     } else {
         lv_obj_set_style_text_color(oilTemp_label, lv_color_white(), 0);
     }
@@ -85,46 +96,118 @@ static void oilTemp_cb(lv_timer_t* timer) {
 /**
  * Car Label Format Callback Ui:
  * Formatting the value displayed on LCD 
+ * Only need to run once during setup, since the timer callbacks will just update the text of the existing labels
  */
 
 static void rpm_format () {
     rpm_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(rpm_label, "0");
-    lv_obj_align(rpm_label, LV_ALIGN_CENTER, 0, -250);  
-    lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_24, 0);
+    rpm_ui = lv_label_create(lv_scr_act());
+
+    if (!rpm_label || !rpm_ui) { 
+        Serial.println("[GUI] rpm_label alloc failed"); 
+        return;
+    }
+     
+    lv_label_set_text(rpm_label, "0"); 
+    lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_48, 0);
     lv_obj_set_style_text_color(rpm_label, lv_color_white(), 0);
+    lv_obj_align(rpm_label, LV_ALIGN_TOP_MID, 0, marginY); 
+
+    lv_obj_update_layout(rpm_label);
+
+    lv_label_set_text(rpm_ui, "RPM");
+    lv_obj_set_style_text_font(rpm_ui, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(rpm_ui, lv_color_white(), 0);
+    lv_obj_align_to(rpm_ui, rpm_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 }
 
 static void carspeed_format () {
     speed_label = lv_label_create(lv_scr_act());
+    speed_ui = lv_label_create(lv_scr_act());
+
+    if (!speed_label || !speed_ui) { 
+        Serial.println("[GUI] speed_label alloc failed"); 
+        return;
+    }
+
     lv_label_set_text(speed_label, "0");
-    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, -150);  
-    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_140, 0);
     lv_obj_set_style_text_color(speed_label, lv_color_white(), 0);
+    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 0);  
+
+    lv_obj_update_layout(speed_label);
+
+    lv_label_set_text(speed_ui, "km/h");
+    lv_obj_set_style_text_font(speed_ui, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(speed_ui, lv_color_white(), 0);
+    lv_obj_align_to(speed_ui, speed_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
 }
 
 static void throttle_format () {
     throttle_label = lv_label_create(lv_scr_act());
+    throttle_ui = lv_label_create(lv_scr_act());
+
+    if (!throttle_label || !throttle_ui) { 
+        Serial.println("[GUI] throttle_label alloc failed"); 
+        return;
+    }
+
     lv_label_set_text(throttle_label, "0%");
-    lv_obj_align(throttle_label, LV_ALIGN_LEFT_MID, 50, 0);  
-    lv_obj_set_style_text_font(throttle_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(throttle_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(throttle_label, lv_color_white(), 0);
+    lv_obj_align(throttle_label, LV_ALIGN_BOTTOM_LEFT, 2*marginX, -2*marginY);  
+
+    lv_obj_update_layout(throttle_label);
+
+    lv_label_set_text(throttle_ui, "TPS");
+    lv_obj_set_style_text_font(throttle_ui, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(throttle_ui, lv_color_white(), 0);
+    lv_obj_align_to(throttle_ui, throttle_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
 }
 
 static void coolantTemp_format () {
     coolantTemp_label = lv_label_create(lv_scr_act());
+    coolantTemp_ui = lv_label_create(lv_scr_act());
+
+    if (!coolantTemp_label || !coolantTemp_ui) { 
+        Serial.println("[GUI] coolantTemp_label alloc failed"); 
+        return;
+    }
+
     lv_label_set_text(coolantTemp_label, "0°C");
-    lv_obj_align(coolantTemp_label, LV_ALIGN_LEFT_MID, 50, 50);  
-    lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
+    lv_obj_align(coolantTemp_label, LV_ALIGN_TOP_LEFT, marginX, marginY);  
+
+    lv_obj_update_layout(coolantTemp_label);
+
+    lv_label_set_text(coolantTemp_ui, "Coolant");
+    lv_obj_set_style_text_font(coolantTemp_ui, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(coolantTemp_ui, lv_color_white(), 0);
+    lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, marginX, marginY/2);
 }
 
 static void oilTemp_format () {
     oilTemp_label = lv_label_create(lv_scr_act());
+    oilTemp_ui = lv_label_create(lv_scr_act());
+
+    if (!oilTemp_label || !oilTemp_ui) { 
+        Serial.println("[GUI] oilTemp_label alloc failed"); 
+        return;
+    }
+
     lv_label_set_text(oilTemp_label, "0°C");
-    lv_obj_align(oilTemp_label, LV_ALIGN_LEFT_MID, 50, 100);  
-    lv_obj_set_style_text_font(oilTemp_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(oilTemp_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(oilTemp_label, lv_color_white(), 0);
+    lv_obj_align(oilTemp_label, LV_ALIGN_TOP_RIGHT, -marginX, marginY);  
+
+    lv_obj_update_layout(oilTemp_label);
+
+    lv_label_set_text(oilTemp_ui, "Oil");
+    lv_obj_set_style_text_font(oilTemp_ui, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(oilTemp_ui, lv_color_white(), 0);
+    lv_obj_align_to(oilTemp_ui, oilTemp_label, LV_ALIGN_OUT_BOTTOM_MID, -marginX, marginY/2);
+
 }
 
 // Private Hardware Handles
@@ -174,7 +257,7 @@ void GuiTask(void* pvParameters) {
     // 2. LVGL Init
     lv_init();
     // Internal RAM buffer (1024 * 40 pixels)
-    buf1 = (lv_color_t*)malloc(1024 * 40 * sizeof(lv_color_t));
+    buf1 = (lv_color_t*)heap_caps_malloc(1024 * 40 * sizeof(lv_color_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
     lv_disp_draw_buf_init(&draw_buf, buf1, NULL, 1024 * 40);
 
     static lv_disp_drv_t disp_drv;
@@ -187,14 +270,16 @@ void GuiTask(void* pvParameters) {
 
     // 3. Create UI
     if (xSemaphoreTake(gui_mutex, portMAX_DELAY)) {
-        // // Screen init
+        // Screen init
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
+        // Format init
         carspeed_format();
         rpm_format();
         throttle_format();
         coolantTemp_format();
         oilTemp_format();
 
+        // Value update timers
         lv_timer_create(rpm_cb, 500, NULL);
         lv_timer_create(carspeed_cb, 1000, NULL);
         lv_timer_create(throttle_cb, 500, NULL);
