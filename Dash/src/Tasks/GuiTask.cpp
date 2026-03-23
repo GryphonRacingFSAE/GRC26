@@ -10,6 +10,8 @@
 #include <esp_display_panel.hpp>
 #include <drivers/lcd/esp_panel_lcd_st7262.hpp>
 
+#include "DataAcqTask.h"
+
 #define GUI_TASK_PERIOD_MS 5 // 200Hz Refresh
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
@@ -31,11 +33,14 @@ static lv_obj_t* throttle_ui = nullptr;
 static lv_obj_t* coolantTemp_ui = nullptr; 
 static lv_obj_t* oilTemp_ui = nullptr;
 
-volatile uint16_t rpm_value DRAM_ATTR = 0;
-volatile uint8_t speed_value DRAM_ATTR = 0;  
-volatile uint8_t throttle_value DRAM_ATTR = 0;
-volatile int16_t coolantTemp_value DRAM_ATTR = 0;
-volatile int16_t oilTemp_value DRAM_ATTR = 0;
+// // Testing values
+// static uint16_t rpm_value = 0;
+// static uint8_t speed_value = 0;  
+// static uint8_t throttle_value = 0;
+// static int16_t coolantTemp_value = 0;
+// static int16_t oilTemp_value = 0;
+
+static EcuData_t dataGui = {0};
 
 // Global UI constant
 static constexpr int8_t marginX = 50;
@@ -45,33 +50,32 @@ static constexpr int8_t marginY = 50;
  * Car Numerical Value Callback Ui:
  * Timer callback to update the counter value and label text every 100ms
  * Testing LVGL timers and dynamic label updates. Will be used for periodic UI updates in the future.
- * Ignore stuff like "%8d", it's just for formatting the text to look nice on the LCD.
  */
 
 static void rpm_cb(lv_timer_t* timer) {
-    rpm_value += 1000;  
-    lv_label_set_text_fmt(rpm_label, "%d", rpm_value);
+    // rpm_value += 1000;  
+    lv_label_set_text_fmt(rpm_label, "%d", dataGui.rpm);
 }
 
 static void carspeed_cb(lv_timer_t* timer) {
-    speed_value = 68;  
-    lv_label_set_text_fmt(speed_label, "%d", speed_value);
+    // speed_value = 68;  
+    lv_label_set_text_fmt(speed_label, "%d", dataGui.speed);
 } 
 
 static void throttle_cb(lv_timer_t* timer) {
-    throttle_value = 67;  
-    lv_label_set_text_fmt(throttle_label, "%d%%", throttle_value);
+    // throttle_value = 67;  
+    lv_label_set_text_fmt(throttle_label, "%d%%", dataGui.tps);
 }
 
 static void coolantTemp_cb(lv_timer_t* timer) {
-    coolantTemp_value = 108;
+    // coolantTemp_value = 108;
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d°C", coolantTemp_value);
+    snprintf(buf, sizeof(buf), "%d°C", dataGui.clt);
     lv_label_set_text(coolantTemp_label, buf);
 
-    if(coolantTemp_value > 115) {
+    if(dataGui.clt > 115) {
         lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFF2C2C), 0);
-    } else if(coolantTemp_value > 107) {
+    } else if(dataGui.clt > 107) {
         lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFFCE1B), 0);
     } else {
         lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
@@ -79,14 +83,14 @@ static void coolantTemp_cb(lv_timer_t* timer) {
 }
 
 static void oilTemp_cb(lv_timer_t* timer) {
-    oilTemp_value = 167;  
+    // oilTemp_value = 167;  
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d°C", oilTemp_value);
+    snprintf(buf, sizeof(buf), "%d°C", dataGui.oilTemp);
     lv_label_set_text(oilTemp_label, buf);
 
-    if(oilTemp_value > 121) {
+    if(dataGui.oilTemp > 121) {
         lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFF2C2C), 0);
-    } else if(oilTemp_value > 110) {
+    } else if(dataGui.oilTemp > 110) {
         lv_obj_set_style_text_color(oilTemp_label, lv_color_hex(0xFFCE1B), 0);
     } else {
         lv_obj_set_style_text_color(oilTemp_label, lv_color_white(), 0);
@@ -181,10 +185,10 @@ static void coolantTemp_format () {
 
     lv_obj_update_layout(coolantTemp_label);
 
-    lv_label_set_text(coolantTemp_ui, "Coolant");
+    lv_label_set_text(coolantTemp_ui, "CLT");
     lv_obj_set_style_text_font(coolantTemp_ui, &lv_font_montserrat_36, 0);
     lv_obj_set_style_text_color(coolantTemp_ui, lv_color_white(), 0);
-    lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, marginX, marginY/2);
+    lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 }
 
 static void oilTemp_format () {
@@ -206,8 +210,7 @@ static void oilTemp_format () {
     lv_label_set_text(oilTemp_ui, "Oil");
     lv_obj_set_style_text_font(oilTemp_ui, &lv_font_montserrat_36, 0);
     lv_obj_set_style_text_color(oilTemp_ui, lv_color_white(), 0);
-    lv_obj_align_to(oilTemp_ui, oilTemp_label, LV_ALIGN_OUT_BOTTOM_MID, -marginX, marginY/2);
-
+    lv_obj_align_to(oilTemp_ui, oilTemp_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 }
 
 // Private Hardware Handles
@@ -227,6 +230,7 @@ static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t
 void GuiTask(void* pvParameters) {
     GuiTaskParameters* params = (GuiTaskParameters*)pvParameters;
     SemaphoreHandle_t gui_mutex = *params->guiMutex;
+    QueueHandle_t data_queue = *params->dataQueue;
 
     Serial.println("[GUI] Init Started");
 
@@ -256,8 +260,7 @@ void GuiTask(void* pvParameters) {
 
     // 2. LVGL Init
     lv_init();
-    // Internal RAM buffer (1024 * 40 pixels)
-    buf1 = (lv_color_t*)heap_caps_malloc(1024 * 40 * sizeof(lv_color_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    buf1 = (lv_color_t*)malloc(1024 * 40 * sizeof(lv_color_t));
     lv_disp_draw_buf_init(&draw_buf, buf1, NULL, 1024 * 40);
 
     static lv_disp_drv_t disp_drv;
@@ -279,12 +282,12 @@ void GuiTask(void* pvParameters) {
         coolantTemp_format();
         oilTemp_format();
 
-        // Value update timers
-        lv_timer_create(rpm_cb, 500, NULL);
-        lv_timer_create(carspeed_cb, 1000, NULL);
-        lv_timer_create(throttle_cb, 500, NULL);
-        lv_timer_create(coolantTemp_cb, 2000, NULL);
-        lv_timer_create(oilTemp_cb, 2000, NULL);
+        // Value update 
+        lv_timer_create(rpm_cb, 1009, NULL);
+        lv_timer_create(carspeed_cb, 1013, NULL);
+        lv_timer_create(throttle_cb, 1019, NULL);
+        lv_timer_create(coolantTemp_cb, 1021, NULL);
+        lv_timer_create(oilTemp_cb, 1031, NULL);
 
         xSemaphoreGive(gui_mutex);
     }
@@ -297,6 +300,14 @@ void GuiTask(void* pvParameters) {
 
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
+        xQueueReceive(data_queue, &dataGui, 0);
+
+        if (xQueueReceive(data_queue, &dataGui, 0) == pdTRUE) {
+            Serial.printf("[GUI RX] RPM: %d  Speed: %d  TPS: %d  CLT: %d  Oil: %d\n",
+                        dataGui.rpm, dataGui.speed, dataGui.tps, 
+                        dataGui.clt, dataGui.oilTemp);
+        }
 
         if (xSemaphoreTake(gui_mutex, 0) == pdTRUE) {
             Serial.println("GUI Task");

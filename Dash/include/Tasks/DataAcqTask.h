@@ -4,6 +4,19 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include <freertos/semphr.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+typedef struct {
+    uint16_t rpm;
+    uint16_t speed;
+    uint16_t wheelSpeed;
+    uint16_t tps;
+    int16_t clt;
+    int16_t oilTemp;
+    bool oilPressure_flag;
+} EcuData_t;
 
 typedef struct {
     QueueHandle_t* dataQueue;

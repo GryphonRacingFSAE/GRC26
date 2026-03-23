@@ -49,7 +49,7 @@
 
 /*1: use custom malloc/free, 0: use the built-in `lv_mem_alloc()` and `lv_mem_free()`*/
 /* ENABLED: Uses ESP32 system malloc so it can access PSRAM */
-#define LV_MEM_CUSTOM 1
+#define LV_MEM_CUSTOM 0
 
 #if LV_MEM_CUSTOM == 0
     /*Size of the memory available for `lv_mem_alloc()` in bytes (>= 2kB)*/

@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "lvgl.h": "c"
+        "lvgl.h": "c",
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp"
     }
 }
