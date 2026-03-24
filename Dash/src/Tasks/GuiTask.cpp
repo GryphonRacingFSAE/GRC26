@@ -70,7 +70,7 @@ static void throttle_cb(lv_timer_t* timer) {
 static void coolantTemp_cb(lv_timer_t* timer) {
     // coolantTemp_value = 108;
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d°C", dataGui.clt);
+    snprintf(buf, sizeof(buf), "%.f°C", dataGui.clt);
     lv_label_set_text(coolantTemp_label, buf);
 
     if(dataGui.clt > 115) {
@@ -85,7 +85,7 @@ static void coolantTemp_cb(lv_timer_t* timer) {
 static void oilTemp_cb(lv_timer_t* timer) {
     // oilTemp_value = 167;  
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d°C", dataGui.oilTemp);
+    snprintf(buf, sizeof(buf), "%.f°C", dataGui.oilTemp);
     lv_label_set_text(oilTemp_label, buf);
 
     if(dataGui.oilTemp > 121) {
@@ -300,11 +300,9 @@ void GuiTask(void* pvParameters) {
 
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        
-        xQueueReceive(data_queue, &dataGui, 0);
 
         if (xQueueReceive(data_queue, &dataGui, 0) == pdTRUE) {
-            Serial.printf("[GUI RX] RPM: %d  Speed: %d  TPS: %d  CLT: %d  Oil: %d\n",
+            Serial.printf("[GUI RX] RPM: %d  Speed: %d  TPS: %d  CLT: %.f  Oil: %.f\n",
                         dataGui.rpm, dataGui.speed, dataGui.tps, 
                         dataGui.clt, dataGui.oilTemp);
         }

@@ -6,9 +6,13 @@
 #define DATA_TASK_PERIOD_MS 20
 
 static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
+    /**
+     * TODO: 
+     * 1. Try to combine all pirimitive data types into one CAN ID. Variables will be assigned through bit manipulation (offset).
+     * 2. Check for message scale factor.
+     **/
     switch(msg->identifier) {
         case 0x502: // RPM
-            dataOut->rpm = (msg->data[1] << 8) | msg->data[0];
             dataOut->tps = (msg->data[3] << 8) | msg->data[2];
             break;
         case 0x522: // Speed
@@ -19,9 +23,11 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
             break;
         case 0x530: // Coolant Temp
             dataOut->clt = (msg->data[1] << 8) | msg->data[0];
+            dataOut->rpm = (msg->data[1] << 8) | msg->data[0];
             break;
         case 0x536: // Oil Temp
-            dataOut->oilTemp = (msg->data[0] << 8) | msg->data[0];
+            dataOut->oilPressure_flag = (msg->data[0] & 0x01);
+            dataOut->oilTemp = (msg->data[3] << 8) | msg->data[2];
             break;
         }
 }
@@ -38,18 +44,18 @@ void DataAcqTask(void* pvParameters) {
 
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        Serial.println("Data Acquisition Task");
         twai_message_t rx_msg;
 
         // blocking when no message received so no serial flooding
         if(twai_receive(&rx_msg, 0) == ESP_OK) {
             // Debugging code 
+            Serial.println("Data Acquisition Task");
             Serial.printf("[DataAcq] CAN ID: 0x%03X\tDLC: %d", rx_msg.identifier, rx_msg.data_length_code);
             for(int i = 0; i < rx_msg.data_length_code; i++) {
                 Serial.printf("\t0x%02X", rx_msg.data[i]);
             }
             DecodeCanData(&rx_msg, &data);
-            Serial.printf("[DataAcq] RPM: %d  Speed: %d  TPS: %d  CLT: %d  Oil: %d\n", data.rpm, data.speed, data.tps, data.clt, data.oilTemp);
+            Serial.printf("[DataAcq] RPM: %d  Speed: %d  TPS: %d  CLT: %.f  Oil: %.f\n", data.rpm, data.speed, data.tps, data.clt, data.oilTemp);
             xQueueOverwrite(dataQueue, &data);
         }
         // TODO: Read CAN Bus / Sensors here
