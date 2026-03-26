@@ -18,7 +18,7 @@ class DynoApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Dyno Logger")
-        self.resize(10000, 7000)
+        self.resize(1280, 720)
 
         # Main Layout
         central_widget = QWidget()
@@ -62,11 +62,11 @@ class DynoApp(QMainWindow):
         self.plot_widget.showGrid(x=True, y=True, alpha=0.7)
         
         # Main ViewBox (Left Axis) - Torque
-        self.main_view = self.plot_widget.plotItem.vb   
+        self.main_view = self.plot_widget.plotItem.vb
         self.torque_line = self.plot_widget.plot(pen=pg.mkPen('r', width=2), name="Torque")
 
         self.plot_widget.setXRange(0, 16000, padding = 0.0)
-        self.plot_widget.setYRange(0, 75,    padding = 0.0)
+        self.plot_widget.setYRange(0,    75, padding = 0.0)
         self.main_view.setMouseEnabled(x = False, y = False)  # Disable zooming/panning 
         
         # Secondary ViewBox (Right Axis) - HP
@@ -76,12 +76,13 @@ class DynoApp(QMainWindow):
         self.hp_view.setXLink(self.main_view)
 
         self.hp_view.setYRange(0, 150, padding = 0.0)
-        self.hp_view.setMouseEnabled(x = False, y = False)  # Disable zoom
+        self.hp_view.setMouseEnabled(x = False, y = False)
 
         # Add HP Curve to secondary view
-        self.hp_line = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), name="Horesepower")
+        self.hp_line = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), name="Horsepower")
         self.hp_view.addItem(self.hp_line)
-        
+
+        # Single legend with both items
         self.legend = self.plot_widget.addLegend(offset=(10, 10))
         self.legend.addItem(self.hp_line, "Horsepower")
 
@@ -118,7 +119,7 @@ class DynoApp(QMainWindow):
         
         # Marker state
         self.marker_lines = []
-        self.marker_events = []  
+        self.marker_events = []
         self.last_rpm = None
         self.last_torque = None
         self.last_hp = None
@@ -130,7 +131,7 @@ class DynoApp(QMainWindow):
         self.serial_port = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
-        self.timer.start(30) 
+        self.timer.start(30)
 
 
     def refresh_ports(self):
@@ -153,10 +154,13 @@ class DynoApp(QMainWindow):
                     self.serial_port = serial.Serial(port, 115200, timeout=0.02)
                 self.connect_btn.setText("Disconnect")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to connect to port {port}")
-                
+                QMessageBox.critical(self, "Error", f"Failed to connect to port {port}: {e}")
         else:
-            self.serial_port.close()
+            if self.serial_port:
+                try:
+                    self.serial_port.close()
+                except Exception:
+                    pass
             self.serial_port = None
             self.connect_btn.setText("Connect")
 
@@ -183,7 +187,6 @@ class DynoApp(QMainWindow):
     def stop_run(self):
         if not self.is_running:
             return
-            
         self.is_running = False
         print(f"Run stopped. Gathered {len(self.torque_data)} samples.")
         self.save_data_to_csv()
@@ -194,11 +197,10 @@ class DynoApp(QMainWindow):
             return
             
         filename = self.filename_input.text().strip()
-        if not filename:
+        if not filename or filename == "Enter File Name":
             filename = "Unnamed_Run"
             
         os.makedirs("outputs", exist_ok=True)
-        
         filepath = os.path.join("outputs", f"{filename}.csv")
         marker_filepath = os.path.join("outputs", f"{filename}_markers.csv")
 
@@ -245,11 +247,10 @@ class DynoApp(QMainWindow):
 
     def update_plot(self):
         if RunDemo and self.is_running:
-            
             self.demo_rpm = min(self.demo_rpm + 25, 12000)
             rpm = self.demo_rpm
             
-            torque = 40 + 25*math.sin((rpm-2000)/2500) + random.uniform(-1.0, 1.0)
+            torque = 40 + 25 * math.sin((rpm - 2000) / 2500) + random.uniform(-1.0, 1.0)
             hp = torque * rpm / 5252.0
 
             self.last_rpm = rpm
@@ -264,32 +265,42 @@ class DynoApp(QMainWindow):
             self.hp_line.setData(x=self.rpm_data, y=self.hp_data)
             return
 
-        if self.serial_port and self.serial_port.in_waiting > 0:
-            new_data_arrived = False
-            
-            while self.serial_port.in_waiting > 0:
-                try:
-                    line = self.serial_port.readline().decode('utf-8', errors='ignore').strip()
-                    if line:
-                        torque, hp, rpm = map(float, line.split(','))
-                        
-                        self.last_torque = torque
-                        self.last_hp = hp
-                        self.last_rpm = rpm
+        try:
+            if self.serial_port and self.serial_port.in_waiting > 0:
+                new_data_arrived = False
 
-                        if self.is_running:
-                            self.rpm_data.append(rpm)
-                            self.torque_data.append(torque)
-                            self.hp_data.append(hp)
-                            new_data_arrived = True
+                while self.serial_port.in_waiting > 0:
+                    try:
+                        line = self.serial_port.readline().decode('utf-8', errors='ignore').strip()
+                        if line:
+                            torque, hp, rpm = map(float, line.split(','))
                             
-                except Exception:
-                    pass # Ignore mangled strings during transmission
+                            self.last_torque = torque
+                            self.last_hp = hp
+                            self.last_rpm = rpm
 
-            if self.is_running and new_data_arrived:
-                self.torque_line.setData(x=self.rpm_data, y=self.torque_data)
-                self.hp_line.setData(x=self.rpm_data, y=self.hp_data)
+                            if self.is_running:
+                                self.rpm_data.append(rpm)
+                                self.torque_data.append(torque)
+                                self.hp_data.append(hp)
+                                new_data_arrived = True
 
+                    except Exception:
+                        pass  # Ignore mangled strings during transmission
+
+                if self.is_running and new_data_arrived:
+                    self.torque_line.setData(x=self.rpm_data, y=self.torque_data)
+                    self.hp_line.setData(x=self.rpm_data, y=self.hp_data)
+
+        except serial.SerialException:
+            # Port physically disconnected or reset — clean up the dead handle
+            try:
+                self.serial_port.close()
+            except Exception:
+                pass
+            self.serial_port = None
+            self.connect_btn.setText("Connect")
+            QMessageBox.warning(self, "Serial Disconnected", "The serial port was lost. Please reconnect.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
