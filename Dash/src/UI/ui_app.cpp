@@ -13,22 +13,8 @@ static lv_obj_t* app_bar   = nullptr;
 static lv_obj_t* app_label = nullptr;
 static lv_obj_t* app_ui    = nullptr; 
 
-static EcuData_t app_gui = {0};
-
 static inline void set_bar_color(lv_obj_t* bar, lv_color_t color) {
     lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
-}
-
-static void app_cb(lv_timer_t* timer) {
-    uint8_t val = (app_gui.apps > 100) ? 100 : app_gui.apps;
- 
-    lv_bar_set_value(app_bar, val, LV_ANIM_OFF);
-    lv_label_set_text_fmt(app_label, "%d%%", val);
- 
-    lv_color_t col = (val < 50) ? lv_color_hex(0x00C853)   // green
-                   : (val < 80) ? lv_color_hex(0xFFD600)   // amber
-                   :              lv_color_hex(0xFF1744);   // red
-    set_bar_color(app_bar, col);
 }
 
 static void app_format() {
@@ -62,9 +48,16 @@ static void app_format() {
 
 void ui_app_init() {
     app_format();
-    lv_timer_create(app_cb, 547, NULL);
 }
 
 void ui_app_update(const EcuData_t* data) {
-    app_gui = *data;
+    uint8_t val = (data->apps > 100) ? 100 : data->apps;
+ 
+    lv_bar_set_value(app_bar, val, LV_ANIM_OFF);
+    lv_label_set_text_fmt(app_label, "%d%%", val);
+ 
+    lv_color_t col = (val < 50) ? lv_color_hex(0x00C853)   // green
+                   : (val < 80) ? lv_color_hex(0xFFD600)   // amber
+                   :              lv_color_hex(0xFF1744);   // red
+    set_bar_color(app_bar, col);
 }

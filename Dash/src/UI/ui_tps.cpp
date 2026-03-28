@@ -12,12 +12,6 @@ static constexpr int8_t marginY = 50;
 static lv_obj_t* throttle_label = nullptr;
 static lv_obj_t* throttle_ui = nullptr;
 
-static EcuData_t tps_gui = {0};
-
-static void throttle_cb(lv_timer_t* timer) {
-    lv_label_set_text_fmt(throttle_label, "%d%%", tps_gui.tps);
-}
-
 void ui_tps_init () {
     throttle_label = lv_label_create(lv_scr_act());
     throttle_ui = lv_label_create(lv_scr_act());
@@ -38,10 +32,8 @@ void ui_tps_init () {
     lv_obj_set_style_text_font(throttle_ui, &lv_font_montserrat_36, 0);
     lv_obj_set_style_text_color(throttle_ui, lv_color_white(), 0);
     lv_obj_align_to(throttle_ui, throttle_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
-
-    lv_timer_create(throttle_cb, 523, NULL);
 }
 
 void ui_tps_update(const EcuData_t* data) {
-    tps_gui = *data;
+    lv_label_set_text_fmt(throttle_label, "%d%%", data->tps);
 }

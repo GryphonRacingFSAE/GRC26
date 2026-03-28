@@ -15,23 +15,8 @@ static lv_obj_t* brake_bar   = nullptr;
 static lv_obj_t* brake_label = nullptr;
 static lv_obj_t* brake_ui    = nullptr; 
 
-static EcuData_t bp_gui = {0};
-
 static inline void set_bar_color(lv_obj_t* bar, lv_color_t color) {
     lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
-}
-
-static void brakePressure_cb(lv_timer_t* timer) {
-    int32_t pct = (int32_t)((bp_gui.bp / BRAKE_PRES_MAX) * 100.0f);
-    pct = (pct > 100) ? 100 : (pct < 0) ? 0 : pct;
- 
-    lv_bar_set_value(brake_bar, pct, LV_ANIM_OFF);
-    lv_label_set_text_fmt(brake_label, "%d", bp_gui.bp);
- 
-    lv_color_t col = (pct < 30) ? lv_color_hex(0x2979FF)   // blue
-                   : (pct < 70) ? lv_color_hex(0xAA00FF)   // purple
-                   :              lv_color_hex(0xFF1744);  // red
-    set_bar_color(brake_bar, col);
 }
 
 static void brake_format() {
@@ -65,9 +50,17 @@ static void brake_format() {
 
 void ui_bp_init() {
     brake_format();
-    lv_timer_create(brakePressure_cb, 541, NULL);
 }
 
 void ui_bp_update(const EcuData_t* data) {
-    bp_gui = *data;
+    int32_t pct = (int32_t)((data->bp / BRAKE_PRES_MAX) * 100.0f);
+    pct = (pct > 100) ? 100 : (pct < 0) ? 0 : pct;
+ 
+    lv_bar_set_value(brake_bar, pct, LV_ANIM_OFF);
+    lv_label_set_text_fmt(brake_label, "%d", data->bp);
+ 
+    lv_color_t col = (pct < 30) ? lv_color_hex(0x2979FF)   // blue
+                   : (pct < 70) ? lv_color_hex(0xAA00FF)   // purple
+                   :              lv_color_hex(0xFF1744);  // red
+    set_bar_color(brake_bar, col);
 }
