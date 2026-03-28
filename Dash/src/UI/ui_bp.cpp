@@ -26,7 +26,7 @@ static void brakePressure_cb(lv_timer_t* timer) {
     pct = (pct > 100) ? 100 : (pct < 0) ? 0 : pct;
  
     lv_bar_set_value(brake_bar, pct, LV_ANIM_OFF);
-    lv_label_set_text_fmt(brake_label, "%.0f", bp_gui.bp);
+    lv_label_set_text_fmt(brake_label, "%d", bp_gui.bp);
  
     lv_color_t col = (pct < 30) ? lv_color_hex(0x2979FF)   // blue
                    : (pct < 70) ? lv_color_hex(0xAA00FF)   // purple
@@ -51,7 +51,7 @@ static void brake_format() {
     lv_obj_align(brake_bar, LV_ALIGN_RIGHT_MID,-(METER_RIGHT_X + METER_W), 0);
  
     brake_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(brake_label, "kPa");
+    lv_label_set_text(brake_label, "0");
     lv_obj_set_style_text_font(brake_label, &lv_font_montserrat_36, 0);
     lv_obj_set_style_text_color(brake_label, lv_color_white(), 0);
     lv_obj_align_to(brake_label, brake_bar, LV_ALIGN_OUT_TOP_MID, 0, -10);
@@ -65,7 +65,7 @@ static void brake_format() {
 
 void ui_bp_init() {
     brake_format();
-    lv_timer_create(brakePressure_cb, 1031, NULL);
+    lv_timer_create(brakePressure_cb, 541, NULL);
 }
 
 void ui_bp_update(const EcuData_t* data) {

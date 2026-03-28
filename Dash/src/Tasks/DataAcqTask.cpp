@@ -11,30 +11,48 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
      * 1. Try to combine all pirimitive data types into one CAN ID. Variables will be assigned through bit manipulation (offset).
      * 2. Check for message scale factor.
      **/
+
+    // Currently using default CAN ID from MaxxECU Race
     switch(msg->identifier) {
-        case 0x502: // RPM
-            dataOut->tps = (msg->data[3] << 8) | msg->data[2];
-            break;
-        case 0x522: // Speed
-            dataOut->speed = (msg->data[1] << 8) | msg->data[0];
-            break;
-        case 0x523: // Wheel Speed
-            dataOut->wheelSpeed = (msg->data[1] << 8) | msg->data[0];
-            break;
+        case 0x520: // RPM + TPS
+            {
+                uint16_t rpm_raw = (msg->data[1] << 8) | msg->data[0];
+                uint16_t tps_raw = (msg->data[3] << 8) | msg->data[2];
+                dataOut->rpm = rpm_raw;
+                dataOut->tps = tps_raw * 0.1f;
+                break;
+            }
+        case 0x522: // Vehicle Speed
+            {
+                uint16_t vss_raw = (msg->data[7] << 8) | msg->data[6];
+                dataOut->speed = vss_raw * 0.1f;
+                break;
+            }
+        case 0x523: // WheelSpeedAvgDriven
+            {
+                uint16_t wss_raw = (msg->data[3] << 8) | msg->data[2];
+                dataOut->wheelSpeed = wss_raw * 0.1f;
+                break;
+            }
         case 0x530: // Coolant Temp
-            dataOut->clt = (msg->data[1] << 8) | msg->data[0];
-            dataOut->rpm = (msg->data[1] << 8) | msg->data[0];
-            break;
-        case 0x536: // Oil Temp
-            dataOut->oilPressure_flag = (msg->data[0] & 0x01);
-            dataOut->oilTemp = (msg->data[3] << 8) | msg->data[2];
-            break;
+            {
+                uint16_t clt_raw = (msg->data[7] << 8) | msg->data[6];
+                dataOut->clt = clt_raw * 0.1f;
+                break;
+            }    
+        case 0x536: // Oil Pressure
+            {
+                uint16_t oilPressure_raw = (msg->data[5] << 8) | msg->data[4];
+                dataOut->oilPressure = oilPressure_raw * 0.1f;
+                break;
+            }
         }
 }
 
 void DataAcqTask(void* pvParameters) {
     DataAcqTaskParameters* params = (DataAcqTaskParameters*)pvParameters;
     QueueHandle_t dataQueue = *(params->dataQueue);
+    twai_message_t rx_msg;
 
     Serial.println("[Data] Task Started");
 
@@ -44,19 +62,19 @@ void DataAcqTask(void* pvParameters) {
 
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        twai_message_t rx_msg;
+        esp_err_t err = twai_receive(&rx_msg, portMAX_DELAY);   
 
         // blocking when no message received so no serial flooding
-        if(twai_receive(&rx_msg, 0) == ESP_OK) {
+        if(err == ESP_OK) {
             // Debugging code 
-            Serial.println("Data Acquisition Task");
+            Serial.println("Data Acquisition Task");  
             Serial.printf("[DataAcq] CAN ID: 0x%03X\tDLC: %d", rx_msg.identifier, rx_msg.data_length_code);
             for(int i = 0; i < rx_msg.data_length_code; i++) {
                 Serial.printf("\t0x%02X", rx_msg.data[i]);
             }
             DecodeCanData(&rx_msg, &data);
-            Serial.printf("[DataAcq] RPM: %d  Speed: %d  TPS: %d  CLT: %.f  Oil: %.f\n", data.rpm, data.speed, data.tps, data.clt, data.oilTemp);
-            xQueueOverwrite(dataQueue, &data);
+            Serial.printf("[DataAcq] RPM: %d  Speed: %d  WheelSpeed: %d  TPS: %d  CLT: %d  Oil: %d BP: %d APPS: %d\n", data.rpm, data.speed, data.wheelSpeed, data.tps, data.clt, data.oilPressure, data.bp, data.apps);
+            xQueueSend(dataQueue, &data, 0);
         }
         // TODO: Read CAN Bus / Sensors here
         // xQueueSend(*params->dataQueue, &myPacket, 0);

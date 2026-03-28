@@ -20,17 +20,8 @@
 
 using namespace esp_panel::drivers;
 
-/**
- * Car Numerical Value Callback Ui:
- * Timer callback to update the counter value and label text every 100ms
- * Testing LVGL timers and dynamic label updates. Will be used for periodic UI updates in the future.
- */
-
-/**
- * Car Label Format Callback Ui:
- * Formatting the value displayed on LCD 
- * Only need to run once during setup, since the timer callbacks will just update the text of the existing labels
- */
+// TODO: Add Gryphon Racing Logo
+LV_IMG_DECLARE(banner);
 
 // Private Hardware Handles
 static BusRGB* panel_bus = nullptr;
@@ -42,6 +33,16 @@ static lv_color_t* buf1 = nullptr;
 static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
     int w = (area->x2 - area->x1 + 1);
     int h = (area->y2 - area->y1 + 1);
+
+    // Swap R and B in-place (RGB565 ↔ BGR565)
+    uint16_t* px = (uint16_t*)color_p;
+    for (int i = 0; i < w * h; i++) {
+        uint16_t c = px[i];
+        px[i] = ((c & 0xF800) >> 11) |   // R -> B
+                (c & 0x07E0) |           // G stays
+                ((c & 0x001F) << 11);    // B -> R
+    }
+
     panel_lcd->drawBitmap(area->x1, area->y1, w, h, (uint8_t *)color_p);
     lv_disp_flush_ready(disp);
 }
@@ -100,7 +101,11 @@ void GuiTask(void* pvParameters) {
         ui_tps_init();
         ui_bp_init();
         ui_app_init();
-        // Value update 
+
+        lv_obj_t* grc_logo = lv_img_create(lv_scr_act());
+        lv_img_set_src(grc_logo, &banner);
+        lv_obj_align(grc_logo, LV_ALIGN_BOTTOM_MID, 0, -50);
+        lv_obj_set_size(grc_logo, 300, 98);
         xSemaphoreGive(gui_mutex);
     }
     
@@ -115,7 +120,7 @@ void GuiTask(void* pvParameters) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         if (xQueueReceive(data_queue, &dataGui, 0) == pdTRUE) {
-            Serial.printf("[GUI RX] RPM: %d  Speed: %d  TPS: %d  CLT: %.f  Oil: %.f\n",
+            Serial.printf("[GUI RX] RPM: %d  Speed: %d  TPS: %d  CLT: %d  Oil: %d\n",
                         dataGui.rpm, dataGui.speed, dataGui.tps, 
                         dataGui.clt, dataGui.oilPressure);
             ui_speed_rpm_update(&dataGui);

@@ -64,8 +64,8 @@ void ui_speed_rpm_init() {
     lv_obj_set_style_text_color(rpm_ui, lv_color_white(), 0);
     lv_obj_align_to(rpm_ui, rpm_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 
-    lv_timer_create(rpm_cb, 1009, NULL);
-    lv_timer_create(carspeed_cb, 1013, NULL);
+    lv_timer_create(rpm_cb, 503, NULL);
+    lv_timer_create(carspeed_cb, 509, NULL);
 }
 
 void ui_speed_rpm_update(const EcuData_t* data) {

@@ -62,7 +62,7 @@ static void app_format() {
 
 void ui_app_init() {
     app_format();
-    lv_timer_create(app_cb, 1033, NULL);
+    lv_timer_create(app_cb, 547, NULL);
 }
 
 void ui_app_update(const EcuData_t* data) {

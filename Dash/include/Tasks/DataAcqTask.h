@@ -13,9 +13,11 @@ typedef struct {
     uint16_t speed;
     uint16_t wheelSpeed;
     uint16_t tps;
-    float clt;
-    float oilTemp;
-    uint16_t oilPressure_flag;
+    uint16_t clt;
+    uint16_t oilPressure;
+    bool oilPressure_flag;
+    uint8_t bp;
+    uint16_t apps;
 } EcuData_t;
 
 typedef struct {

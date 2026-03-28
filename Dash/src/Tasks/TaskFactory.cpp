@@ -38,8 +38,7 @@ void createTasks() {
 
     // 1. Objects
     guiMutexHandle = xSemaphoreCreateMutex();
-    // uxQueueLength = 1 for xQueueOverwrite for DataAcqTask
-    dataQueueHandle = xQueueCreate(1, sizeof(EcuData_t)); // Update sizeof() later
+    dataQueueHandle = xQueueCreate(10, sizeof(EcuData_t)); // Update sizeof() later
 
     // 2. Params
     guiParams.guiMutex = &guiMutexHandle;

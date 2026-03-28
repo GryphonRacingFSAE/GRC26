@@ -49,7 +49,7 @@ void ui_clt_init() {
     lv_obj_set_style_text_color(coolantTemp_ui, lv_color_white(), 0);
     lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
 
-    lv_timer_create(coolantTemp_cb, 1021, NULL);
+    lv_timer_create(coolantTemp_cb, 521, NULL);
 }
 
 void ui_clt_update(const EcuData_t* data) {

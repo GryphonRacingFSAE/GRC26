@@ -39,7 +39,7 @@ void ui_tps_init () {
     lv_obj_set_style_text_color(throttle_ui, lv_color_white(), 0);
     lv_obj_align_to(throttle_ui, throttle_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
 
-    lv_timer_create(throttle_cb, 1019, NULL);
+    lv_timer_create(throttle_cb, 523, NULL);
 }
 
 void ui_tps_update(const EcuData_t* data) {
