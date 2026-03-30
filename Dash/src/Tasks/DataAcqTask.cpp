@@ -5,6 +5,26 @@
 
 #define DATA_TASK_PERIOD_MS 20
 
+// CAN Init
+static twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_15, GPIO_NUM_16, TWAI_MODE_NORMAL);
+static twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS(); 
+static twai_filter_config_t f_config;
+
+static void initCAN() {
+    f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+    esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config);
+
+    if (err == ESP_OK) {
+        Serial.println("[DataAcq] TWAI Driver Installed");
+    }
+
+    err = twai_start();
+    if (err == ESP_OK) {
+        Serial.println("[DataAcq] TWAI Started");
+    }
+
+}
+
 static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
     // TODO: Optimize the code.
     // Currently using default CAN ID from MaxxECU Race
@@ -47,6 +67,7 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
 void DataAcqTask(void* pvParameters) {
     DataAcqTaskParameters* params = (DataAcqTaskParameters*)pvParameters;
     QueueHandle_t data_queue = *(params->dataQueue);
+    initCAN();
     twai_message_t rx_msg;
 
     Serial.println("[Data] Task Started");
@@ -60,18 +81,19 @@ void DataAcqTask(void* pvParameters) {
         esp_err_t err = twai_receive(&rx_msg, portMAX_DELAY);   
 
         // blocking when no message received so no serial flooding
-        if(err == ESP_OK) {
-            // Debugging code 
-            Serial.println("Data Acquisition Task");  
-            Serial.printf("[DataAcq] CAN ID: 0x%03X\tDLC: %d", rx_msg.identifier, rx_msg.data_length_code);
-            for(int i = 0; i < rx_msg.data_length_code; i++) {
-                Serial.printf("\t0x%02X", rx_msg.data[i]);
-            }
-            DecodeCanData(&rx_msg, &data);
-            xQueueSend(data_queue, &data, 0);
+        if(err != ESP_OK) {
+            continue;
         }
+
+        // Debugging code 
+        Serial.println("Data Acquisition Task");  
+        Serial.printf("[DataAcq] CAN ID: 0x%03X\tDLC: %d", rx_msg.identifier, rx_msg.data_length_code);
+        for(int i = 0; i < rx_msg.data_length_code; i++) {
+            Serial.printf("\t0x%02X", rx_msg.data[i]);
+        }
+        DecodeCanData(&rx_msg, &data);
+        xQueueSend(data_queue, &data, 0);
         // TODO: Read CAN Bus / Sensors here
         // xQueueSend(*params->dataQueue, &myPacket, 0);
-
     }
 }
