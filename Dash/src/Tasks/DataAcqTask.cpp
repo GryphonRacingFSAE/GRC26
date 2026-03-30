@@ -6,12 +6,7 @@
 #define DATA_TASK_PERIOD_MS 20
 
 static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
-    /**
-     * TODO: 
-     * 1. Try to combine all pirimitive data types into one CAN ID. Variables will be assigned through bit manipulation (offset).
-     * 2. Check for message scale factor.
-     **/
-
+    // TODO: Optimize the code.
     // Currently using default CAN ID from MaxxECU Race
     switch(msg->identifier) {
         case 0x520: // RPM + TPS
@@ -51,7 +46,7 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
 
 void DataAcqTask(void* pvParameters) {
     DataAcqTaskParameters* params = (DataAcqTaskParameters*)pvParameters;
-    QueueHandle_t dataQueue = *(params->dataQueue);
+    QueueHandle_t data_queue = *(params->dataQueue);
     twai_message_t rx_msg;
 
     Serial.println("[Data] Task Started");
@@ -73,8 +68,7 @@ void DataAcqTask(void* pvParameters) {
                 Serial.printf("\t0x%02X", rx_msg.data[i]);
             }
             DecodeCanData(&rx_msg, &data);
-            Serial.printf("[DataAcq] RPM: %d  Speed: %d  WheelSpeed: %d  TPS: %d  CLT: %d  Oil: %d BP: %d APPS: %d\n", data.rpm, data.speed, data.wheelSpeed, data.tps, data.clt, data.oilPressure, data.bp, data.apps);
-            xQueueSend(dataQueue, &data, 0);
+            xQueueSend(data_queue, &data, 0);
         }
         // TODO: Read CAN Bus / Sensors here
         // xQueueSend(*params->dataQueue, &myPacket, 0);

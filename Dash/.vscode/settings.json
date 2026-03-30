@@ -3,6 +3,8 @@
         "lvgl.h": "c",
         "array": "cpp",
         "string": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "bitset": "cpp",
+        "initializer_list": "cpp"
     }
 }

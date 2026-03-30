@@ -20,7 +20,7 @@
 
 using namespace esp_panel::drivers;
 
-// TODO: Add Gryphon Racing Logo
+// TODO: Optimize the code
 LV_IMG_DECLARE(banner);
 
 // Private Hardware Handles
@@ -34,7 +34,10 @@ static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t
     int w = (area->x2 - area->x1 + 1);
     int h = (area->y2 - area->y1 + 1);
 
-    // Swap R and B in-place (RGB565 ↔ BGR565)
+    /**
+     * Swap R and B in-place (RGB565 ↔ BGR565)
+     * For some reason, the LV_COLOR_SWAP 1 switch from BRG to GRB so I did manually here
+     **/
     uint16_t* px = (uint16_t*)color_p;
     for (int i = 0; i < w * h; i++) {
         uint16_t c = px[i];
@@ -119,18 +122,14 @@ void GuiTask(void* pvParameters) {
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-        if (xQueueReceive(data_queue, &dataGui, 0) == pdTRUE) {
-            Serial.printf("[GUI RX] RPM: %d  Speed: %d  TPS: %d  CLT: %d  Oil: %d\n",
-                        dataGui.rpm, dataGui.speed, dataGui.tps, 
-                        dataGui.clt, dataGui.oilPressure);
-            ui_speed_rpm_update(&dataGui);
-            ui_clt_update(&dataGui);
-            ui_tps_update(&dataGui);
-            ui_bp_update(&dataGui);
-            ui_app_update(&dataGui);
-        }
-
         if (xSemaphoreTake(gui_mutex, 0) == pdTRUE) {
+            if (xQueueReceive(data_queue, &dataGui, 0) == pdPASS) {
+                ui_speed_rpm_update(&dataGui);
+                ui_clt_update(&dataGui);
+                ui_tps_update(&dataGui);
+                ui_bp_update(&dataGui);
+                ui_app_update(&dataGui);
+            }
             Serial.println("GUI Task");
             lv_timer_handler();
             xSemaphoreGive(gui_mutex);
