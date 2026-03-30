@@ -28,23 +28,12 @@ static BusRGB* panel_bus = nullptr;
 static LCD_ST7262* panel_lcd = nullptr;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t* buf1 = nullptr;
+static lv_color_t* buf2 = nullptr;
 
 // Flush Callback
 static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
     int w = (area->x2 - area->x1 + 1);
     int h = (area->y2 - area->y1 + 1);
-
-    /**
-     * Swap R and B in-place (RGB565 ↔ BGR565)
-     * For some reason, the LV_COLOR_SWAP 1 switch from BRG to GRB so I did manually here
-     **/
-    uint16_t* px = (uint16_t*)color_p;
-    for (int i = 0; i < w * h; i++) {
-        uint16_t c = px[i];
-        px[i] = ((c & 0xF800) >> 11) |   // R -> B
-                (c & 0x07E0) |           // G stays
-                ((c & 0x001F) << 11);    // B -> R
-    }
 
     panel_lcd->drawBitmap(area->x1, area->y1, w, h, (uint8_t *)color_p);
     lv_disp_flush_ready(disp);
@@ -63,14 +52,18 @@ void GuiTask(void* pvParameters) {
         .h_res = 1024, .v_res = 600,
         .hsync_pulse_width = 20, .hsync_back_porch = 160, .hsync_front_porch = 200,
         .vsync_pulse_width = 3,  .vsync_back_porch = 12,  .vsync_front_porch = 12,
-        .data_width = 16, .bits_per_pixel = 16, .bounce_buffer_size_px = 0,
+        .data_width = 16, .bits_per_pixel = 16, .bounce_buffer_size_px = 1024 * 10,
         .hsync_gpio_num = LCD_HSYNC, .vsync_gpio_num = LCD_VSYNC,
         .de_gpio_num = LCD_DE, .pclk_gpio_num = LCD_PCLK,
         .disp_gpio_num = -1,
+        // Initialize as BRG so the lv_conf swap to RGB
         .data_gpio_nums = {
-            LCD_R3, LCD_R4, LCD_R5, LCD_R6, LCD_R7,
+            // Blue
+            LCD_B3, LCD_B4, LCD_B5, LCD_B6, LCD_B7, 
+            // Green
             LCD_G2, LCD_G3, LCD_G4, LCD_G5, LCD_G6, LCD_G7,
-            LCD_B3, LCD_B4, LCD_B5, LCD_B6, LCD_B7
+            // Red
+            LCD_R3, LCD_R4, LCD_R5, LCD_R6, LCD_R7
         },
     };
     BusRGB::Config bus_config;
@@ -83,8 +76,11 @@ void GuiTask(void* pvParameters) {
 
     // 2. LVGL Init
     lv_init();
-    buf1 = (lv_color_t*)malloc(1024 * 40 * sizeof(lv_color_t));
-    lv_disp_draw_buf_init(&draw_buf, buf1, NULL, 1024 * 40);
+    // Allocate two buffer lines explicitly in SPIRAM
+    uint16_t buf_size = 1024 * 50;
+    buf1 = (lv_color_t*)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    buf2 = (lv_color_t*)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, buf_size);
 
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
@@ -115,6 +111,7 @@ void GuiTask(void* pvParameters) {
     Serial.println("[GUI] Loop Started");
 
     EcuData_t dataGui = {0};
+    EcuData_t dataGui_prev = {0};
     // 4. Precise Loop
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(GUI_TASK_PERIOD_MS);
@@ -123,13 +120,34 @@ void GuiTask(void* pvParameters) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         if (xSemaphoreTake(gui_mutex, 0) == pdTRUE) {
-            if (xQueueReceive(data_queue, &dataGui, 0) == pdPASS) {
-                ui_speed_rpm_update(&dataGui);
-                ui_clt_update(&dataGui);
-                ui_tps_update(&dataGui);
-                ui_bp_update(&dataGui);
-                ui_app_update(&dataGui);
+            bool update_status = false;
+
+            while (xQueueReceive(data_queue, &dataGui, 0) == pdPASS) {
+                update_status = true;
             }
+
+            if (update_status) {
+                // Check for changes and update UI accordingly to minimize unnecessary redraws.
+                if(dataGui.rpm != dataGui_prev.rpm || dataGui.speed != dataGui_prev.speed) {
+                    ui_speed_rpm_update(&dataGui);
+                }
+                if(dataGui.clt != dataGui_prev.clt) {
+                    ui_clt_update(&dataGui);
+                }
+                if(dataGui.tps != dataGui_prev.tps) {
+                    ui_tps_update(&dataGui);
+                }
+                if(dataGui.bp != dataGui_prev.bp) {
+                    ui_bp_update(&dataGui);
+                }
+                if(dataGui.apps != dataGui_prev.apps) {
+                    ui_app_update(&dataGui);
+                }
+                
+                // Save current state for next comparison
+                dataGui_prev = dataGui;
+            }
+
             Serial.println("GUI Task");
             lv_timer_handler();
             xSemaphoreGive(gui_mutex);
