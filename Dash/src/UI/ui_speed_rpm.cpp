@@ -56,6 +56,21 @@ void ui_speed_rpm_init() {
 }
 
 void ui_speed_rpm_update(const EcuData_t* data) {
-    lv_label_set_text_fmt(rpm_label, "%d", data->rpm);
-    lv_label_set_text_fmt(speed_label, "%d", data->speed);
+    uint16_t rpm_prev = 0;
+    uint16_t speed_prev = 0;
+    if(data->rpm == rpm_prev || data->speed == speed_prev) {
+        return; 
+    }
+
+    char rpm_buf[8];
+    char speed_buf[8];
+
+    snprintf(rpm_buf, sizeof(rpm_buf), "%d", data->rpm);
+    snprintf(speed_buf, sizeof(speed_buf), "%d", data->speed);
+
+    lv_label_set_text(rpm_label, rpm_buf);
+    lv_label_set_text(speed_label, speed_buf);
+
+    rpm_prev = data->rpm;
+    speed_prev = data->speed;
 }

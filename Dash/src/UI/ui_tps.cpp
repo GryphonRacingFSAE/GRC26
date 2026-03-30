@@ -35,5 +35,13 @@ void ui_tps_init () {
 }
 
 void ui_tps_update(const EcuData_t* data) {
-    lv_label_set_text_fmt(throttle_label, "%d%%", data->tps);
+    static uint16_t tps_prev = 0;
+    if(data->tps == tps_prev) {
+        return; 
+    }
+
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d%%", data->tps);
+    lv_label_set_text(throttle_label, buf);
+    tps_prev = data->tps;
 }

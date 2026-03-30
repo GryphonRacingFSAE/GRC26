@@ -53,6 +53,11 @@ void ui_bp_init() {
 }
 
 void ui_bp_update(const EcuData_t* data) {
+    uint8_t bp_prev = 0;
+    if(data->bp == bp_prev) {
+        return; 
+    }
+
     int32_t pct = (int32_t)((data->bp / BRAKE_PRES_MAX) * 100.0f);
     pct = (pct > 100) ? 100 : (pct < 0) ? 0 : pct;
  
@@ -63,4 +68,6 @@ void ui_bp_update(const EcuData_t* data) {
                    : (pct < 70) ? lv_color_hex(0xAA00FF)   // purple
                    :              lv_color_hex(0xFF1744);  // red
     set_bar_color(brake_bar, col);
+
+    bp_prev = data->bp;
 }

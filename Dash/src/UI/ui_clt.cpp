@@ -35,6 +35,11 @@ void ui_clt_init() {
 }
 
 void ui_clt_update(const EcuData_t* data) {
+    static uint16_t clt_prev = 0;
+    if(data->clt == clt_prev) {
+        return; 
+    }
+
     char buf[8];
     snprintf(buf, sizeof(buf), "%d°C", data->clt);
     lv_label_set_text(coolantTemp_label, buf);
@@ -46,4 +51,6 @@ void ui_clt_update(const EcuData_t* data) {
     } else {
         lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
     }
+
+    clt_prev = data->clt;
 }

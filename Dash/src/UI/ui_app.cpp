@@ -51,6 +51,11 @@ void ui_app_init() {
 }
 
 void ui_app_update(const EcuData_t* data) {
+    static uint16_t apps_prev = 0;
+    if(data->apps == apps_prev) {
+        return; 
+    }
+
     uint8_t val = (data->apps > 100) ? 100 : data->apps;
  
     lv_bar_set_value(app_bar, val, LV_ANIM_OFF);
@@ -60,4 +65,6 @@ void ui_app_update(const EcuData_t* data) {
                    : (val < 80) ? lv_color_hex(0xFFD600)   // amber
                    :              lv_color_hex(0xFF1744);   // red
     set_bar_color(app_bar, col);
+
+    apps_prev = data->apps;
 }
