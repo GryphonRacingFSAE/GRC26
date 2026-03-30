@@ -88,7 +88,7 @@ void DataAcqTask(void* pvParameters) {
         }
 
         Serial.println("Data Acquisition Task");  
-        // // Debug: Print CAN Message
+        // Debug: Print CAN Message
         Serial.printf("[DataAcq] CAN ID: 0x%03X\tDLC: %d\n", rx_msg.identifier, rx_msg.data_length_code);
         for(int i = 0; i < rx_msg.data_length_code; i++) {
             Serial.printf("\t0x%02X", rx_msg.data[i]);

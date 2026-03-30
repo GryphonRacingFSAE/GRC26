@@ -20,7 +20,6 @@
 
 using namespace esp_panel::drivers;
 
-// TODO: Optimize the code
 LV_IMG_DECLARE(banner);
 
 // Private Hardware Handles
@@ -76,7 +75,7 @@ void GuiTask(void* pvParameters) {
 
     // 2. LVGL Init
     lv_init();
-    // Allocate two buffer lines explicitly in SPIRAM
+    // Allocate two buffer lines explicitly in SPIRAM for FPS performance
     uint16_t buf_size = 1024 * 50;
     buf1 = (lv_color_t*)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
     buf2 = (lv_color_t*)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
@@ -100,7 +99,7 @@ void GuiTask(void* pvParameters) {
         ui_tps_init();
         ui_bp_init();
         ui_app_init();
-
+        // Logo init 
         lv_obj_t* grc_logo = lv_img_create(lv_scr_act());
         lv_img_set_src(grc_logo, &banner);
         lv_obj_align(grc_logo, LV_ALIGN_BOTTOM_MID, 0, -50);
@@ -116,6 +115,10 @@ void GuiTask(void* pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(GUI_TASK_PERIOD_MS);
 
+    /**
+     * While loop: Drain the queue to get the latest data for UI update, discard older data if not processed in time.
+     * dataGui_prev: Cache the previous data to avoid unnecessary UI updates, thus reduce CPU usage.
+     */
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
@@ -127,7 +130,6 @@ void GuiTask(void* pvParameters) {
             }
 
             if (update_status) {
-                // Check for changes and update UI accordingly to minimize unnecessary redraws.
                 if(dataGui.rpm != dataGui_prev.rpm || dataGui.speed != dataGui_prev.speed) {
                     ui_speed_rpm_update(&dataGui);
                 }
