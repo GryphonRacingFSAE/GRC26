@@ -27,8 +27,8 @@ void createTasks() {
     outputsTaskParams.dynoQueue    = &xDynoToOutputsQueue;
 
     xTaskCreate(CANTask,        "CAN", 4096, (void*)&canTaskParams,      1, &canTaskHandle);
-    xTaskCreate(DynoDataTask,  "Data", 4096, (void*)&dynoDataTaskParams, 1, &dataTaskHandle);
-    xTaskCreate(OutputsTask, "Output", 4096, (void*)&outputsTaskParams,  1, &outputTaskHandle);
+    xTaskCreate(DynoDataTask,  "Data", 4096, (void*)&dynoDataTaskParams, 2, &dataTaskHandle);
+    xTaskCreate(OutputsTask, "Output", 4096, (void*)&outputsTaskParams,  2, &outputTaskHandle);
 
     Serial.println("[Factory] Tasks Created");
 }

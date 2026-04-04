@@ -5,9 +5,9 @@
 
 typedef struct
 {
-    int torque;
-    int horsepower;
-    int rpm;
+    float torque;
+    float horsepower;
+    int16_t rpm;
 } DynoData;
 
 typedef struct 

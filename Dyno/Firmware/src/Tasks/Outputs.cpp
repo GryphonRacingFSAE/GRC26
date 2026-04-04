@@ -1,6 +1,7 @@
 #include "Outputs.h"
 
-void OutputsTask(void* pvParameters) {
+void OutputsTask(void* pvParameters) 
+{
 	Serial.println("[Output Task] Started");
 	QueueHandle_t dynoQueue = *((OutputsTaskParameters*)pvParameters)->dynoQueue;
 	DynoData data;
@@ -9,7 +10,8 @@ void OutputsTask(void* pvParameters) {
 	{
 		if(xQueueReceive(dynoQueue, &data, portMAX_DELAY) == pdPASS)
 		{
-			Serial.printf("%d,%d,%d\n", data.torque, data.horsepower, data.rpm);
+			// Serial.printf("%.2f,%.2f,%d\n", data.torque, data.horsepower, data.rpm);
+			Serial.printf("%.2f,%.2f,%d\n", 30.0, 100.0, data.rpm);
 		}
 	}
 }

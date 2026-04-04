@@ -1,4 +1,3 @@
-#include "assert.h"
 #include "CAN.h"
 #include "PinDefs.h"
 #include "driver/twai.h"
@@ -22,21 +21,18 @@ static void initCAN()
     esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config);
     if (err != ESP_OK)
     {
-        Serial.printf("[CAN] Driver install failed: %d\n", err);
         return;
     }
 
     err = twai_start();
     if (err != ESP_OK)
     {
-        Serial.printf("[CAN] Start failed: %d\n", err);
         return;
     }
 }
 
 void CANTask(void *pvParameters)
 {
-    Serial.println("[CAN Task] Started");
     initCAN();
     twai_message_t msg;
 
@@ -44,7 +40,6 @@ void CANTask(void *pvParameters)
 
     for (;;)
     {
-      printf("Waiting for CAN messages...\n");
       esp_err_t err = twai_receive(&msg, portMAX_DELAY);
 
       if (err != ESP_OK)
@@ -52,10 +47,9 @@ void CANTask(void *pvParameters)
         continue;
       }
 
-      if (msg.data_length_code >= 2)
+      if (msg.identifier == 0x520 && msg.data_length_code >= 2)
       {
-        uint16_t rpm = (int16_t)(msg.data[0] | (msg.data[1] << 8));
-        printf("RPM: %d\n", rpm);
+        int16_t rpm = (int16_t)(msg.data[0] | (msg.data[1] << 8));
 
         DynoData data;
         data.rpm        = rpm;
