@@ -8,15 +8,16 @@
 #include <lv_conf.h>
 #include <lvgl.h>
 #include <esp_display_panel.hpp>
+#include <esp_heap_caps.h>
 #include <drivers/lcd/esp_panel_lcd_st7262.hpp>
 
 #include "UI/ui_speed_rpm.h"
 #include "UI/ui_clt.h"
 #include "UI/ui_tps.h"
 #include "UI/ui_bp.h"
-#include "UI/ui_app.h"
+#include "UI/ui_apps.h"
 
-#define GUI_TASK_PERIOD_MS 5 // 200Hz Refresh
+#define GUI_TASK_PERIOD_MS 15 // 67Hz Refresh
 
 using namespace esp_panel::drivers;
 
@@ -98,7 +99,7 @@ void GuiTask(void* pvParameters) {
         ui_clt_init();
         ui_tps_init();
         ui_bp_init();
-        ui_app_init();
+        ui_apps_init();
         // Logo init 
         lv_obj_t* grc_logo = lv_img_create(lv_scr_act());
         lv_img_set_src(grc_logo, &banner);
@@ -115,10 +116,6 @@ void GuiTask(void* pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(GUI_TASK_PERIOD_MS);
 
-    /**
-     * While loop: Drain the queue to get the latest data for UI update, discard older data if not processed in time.
-     * dataGui_prev: Cache the previous data to avoid unnecessary UI updates, thus reduce CPU usage.
-     */
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
@@ -143,14 +140,12 @@ void GuiTask(void* pvParameters) {
                     ui_bp_update(&dataGui);
                 }
                 if(dataGui.apps != dataGui_prev.apps) {
-                    ui_app_update(&dataGui);
+                    ui_apps_update(&dataGui);
                 }
-                
-                // Save current state for next comparison
+
                 dataGui_prev = dataGui;
             }
 
-            Serial.println("GUI Task");
             lv_timer_handler();
             xSemaphoreGive(gui_mutex);
         }

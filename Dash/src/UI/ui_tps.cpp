@@ -16,11 +16,6 @@ void ui_tps_init () {
     throttle_label = lv_label_create(lv_scr_act());
     throttle_ui = lv_label_create(lv_scr_act());
 
-    // if (!throttle_label || !throttle_ui) { 
-    //     Serial.println("[GUI] throttle_label alloc failed"); 
-    //     return;
-    // }
-
     lv_label_set_text(throttle_label, "0%");
     lv_obj_set_style_text_font(throttle_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(throttle_label, lv_color_white(), 0);

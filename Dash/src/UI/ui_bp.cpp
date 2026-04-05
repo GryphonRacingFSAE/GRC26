@@ -1,4 +1,4 @@
-#include "UI/ui_tps.h"
+#include "UI/ui_bp.h"
 
 #define LV_CONF_INCLUDE_SIMPLE
 #include <lv_conf.h>
@@ -53,7 +53,7 @@ void ui_bp_init() {
 }
 
 void ui_bp_update(const EcuData_t* data) {
-    uint8_t bp_prev = 0;
+    static uint8_t bp_prev = 0;
     if(data->bp == bp_prev) {
         return; 
     }

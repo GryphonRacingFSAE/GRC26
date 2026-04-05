@@ -4,8 +4,6 @@
 #include <PeripheralTask.h>
 #include <Arduino.h>
 
-#include "driver/twai.h"
-
 // Static Handles (Private)
 static SemaphoreHandle_t guiMutexHandle;
 static QueueHandle_t     dataQueueHandle;

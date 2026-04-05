@@ -15,21 +15,19 @@ static void initCAN() {
     f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
     esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config);
 
-    if (err == ESP_OK) {
-        Serial.println("[DataAcq] TWAI Driver Installed");
-    }
+    // if (err == ESP_OK) {
+    //     Serial.println("[DataAcq] TWAI Driver Installed");
+    // }
 
     err = twai_start();
-    if (err == ESP_OK) {
-        Serial.println("[DataAcq] TWAI Started");
-    }
-
+    // if (err == ESP_OK) {
+    //     Serial.println("[DataAcq] TWAI Started");
+    // }
 }
 
 static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
-    // TODO: Optimize the code.
-    // Currently using default CAN ID from MaxxECU Race
-    switch(msg->identifier) {
+    if(msg->data_length_code >= 2) {
+        switch(msg->identifier) {
         case 0x520: // RPM + TPS
             {
                 uint16_t rpm_raw = (msg->data[1] << 8) | msg->data[0];
@@ -63,6 +61,8 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
                 break;
             }
         }
+    }
+
 }
 
 void DataAcqTask(void* pvParameters) {
@@ -78,25 +78,13 @@ void DataAcqTask(void* pvParameters) {
     EcuData_t data = {0};
 
     for (;;) {
-        // Uncomment vTaskDelayUntil so it can update in real time.
-        // vTaskDelayUntil(&xLastWakeTime, xFrequency);
         esp_err_t err = twai_receive(&rx_msg, portMAX_DELAY);   
 
-        // blocking when no message received so no serial flooding
         if(err != ESP_OK) {
             continue;
         }
 
-        Serial.println("Data Acquisition Task");  
-        // Debug: Print CAN Message
-        Serial.printf("[DataAcq] CAN ID: 0x%03X\tDLC: %d\n", rx_msg.identifier, rx_msg.data_length_code);
-        for(int i = 0; i < rx_msg.data_length_code; i++) {
-            Serial.printf("\t0x%02X", rx_msg.data[i]);
-        }
-
         DecodeCanData(&rx_msg, &data);
         xQueueSend(data_queue, &data, 0); 
-        // TODO: Read CAN Bus / Sensors here
-        // xQueueSend(*params->dataQueue, &myPacket, 0);
     }
 }

@@ -17,11 +17,6 @@ void ui_speed_rpm_init() {
     speed_label = lv_label_create(lv_scr_act());
     speed_ui = lv_label_create(lv_scr_act());
 
-    // if (!speed_label || !speed_ui) { 
-    //     Serial.println("[GUI] speed_label alloc failed"); 
-    //     return;
-    // }
-
     lv_label_set_text(speed_label, "0");
     lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_140, 0);
     lv_obj_set_style_text_color(speed_label, lv_color_white(), 0);
@@ -36,11 +31,6 @@ void ui_speed_rpm_init() {
 
     rpm_label = lv_label_create(lv_scr_act());
     rpm_ui = lv_label_create(lv_scr_act());
-
-    // if (!rpm_label || !rpm_ui) { 
-    //     Serial.println("[GUI] rpm_label alloc failed"); 
-    //     return;
-    // }
      
     lv_label_set_text(rpm_label, "0"); 
     lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_48, 0);
@@ -56,8 +46,8 @@ void ui_speed_rpm_init() {
 }
 
 void ui_speed_rpm_update(const EcuData_t* data) {
-    uint16_t rpm_prev = 0;
-    uint16_t speed_prev = 0;
+    static uint16_t rpm_prev = 0;
+    static uint16_t speed_prev = 0;
     if(data->rpm == rpm_prev || data->speed == speed_prev) {
         return; 
     }

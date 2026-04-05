@@ -10,11 +10,11 @@
 
 typedef struct {
     uint16_t rpm;
-    uint16_t speed;
-    uint16_t wheelSpeed;
-    uint16_t tps;
-    uint16_t clt;
-    uint16_t oilPressure;
+    float speed;
+    float wheelSpeed;
+    float tps;
+    float clt;
+    float oilPressure;
     bool oilPressure_flag;
     uint8_t bp;
     uint16_t apps;

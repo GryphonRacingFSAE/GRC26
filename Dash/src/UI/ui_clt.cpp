@@ -16,11 +16,6 @@ void ui_clt_init() {
     coolantTemp_label = lv_label_create(lv_scr_act());
     coolantTemp_ui = lv_label_create(lv_scr_act());
 
-    // if (!coolantTemp_label || !coolantTemp_ui) { 
-    //     Serial.println("[GUI] coolantTemp_label alloc failed"); 
-    //     return;
-    // }
-
     lv_label_set_text(coolantTemp_label, "0°C");
     lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
