@@ -1,0 +1,52 @@
+#include "UI/ui_clt.h"
+
+#define LV_CONF_INCLUDE_SIMPLE
+#include <lv_conf.h>
+#include <lvgl.h>
+#include <math.h>
+
+LV_FONT_DECLARE(lv_font_montserrat_96);
+
+static constexpr int8_t marginX = 50;
+static constexpr int8_t marginY = 50;
+
+static lv_obj_t* coolantTemp_label = nullptr;
+static lv_obj_t* coolantTemp_ui = nullptr; 
+
+void ui_clt_init() {
+    coolantTemp_label = lv_label_create(lv_scr_act());
+    coolantTemp_ui = lv_label_create(lv_scr_act());
+
+    lv_label_set_text(coolantTemp_label, "0°C");
+    lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_96, 0);
+    lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
+    lv_obj_align(coolantTemp_label, LV_ALIGN_TOP_LEFT, marginX, marginY);  
+
+    lv_obj_update_layout(coolantTemp_label);
+
+    lv_label_set_text(coolantTemp_ui, "CLT");
+    lv_obj_set_style_text_font(coolantTemp_ui, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(coolantTemp_ui, lv_color_white(), 0);
+    lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
+}
+
+void ui_clt_update(const EcuData_t* data) {
+    static float clt_prev = 0;
+    if(data->clt == clt_prev) {
+        return; 
+    }
+
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d°C", (int)round(data->clt));
+    lv_label_set_text(coolantTemp_label, buf);
+
+    if(data->clt > 115) {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFF2C2C), 0);
+    } else if(data->clt > 107) {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_hex(0xFFCE1B), 0);
+    } else {
+        lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
+    }
+
+    clt_prev = data->clt;
+}

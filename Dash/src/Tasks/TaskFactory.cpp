@@ -19,10 +19,9 @@ static PeripheralTaskParameters periphParams;
 
 void createTasks() {
     Serial.println("[Factory] Creating Tasks...");
-
     // 1. Objects
     guiMutexHandle = xSemaphoreCreateMutex();
-    dataQueueHandle = xQueueCreate(10, sizeof(int)); // Update sizeof() later
+    dataQueueHandle = xQueueCreate(10, sizeof(EcuData_t)); // Update sizeof() later
 
     // 2. Params
     guiParams.guiMutex = &guiMutexHandle;
