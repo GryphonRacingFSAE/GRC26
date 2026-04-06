@@ -3,6 +3,7 @@
 #define LV_CONF_INCLUDE_SIMPLE
 #include <lv_conf.h>
 #include <lvgl.h>
+#include <math.h>
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
@@ -30,13 +31,13 @@ void ui_clt_init() {
 }
 
 void ui_clt_update(const EcuData_t* data) {
-    static uint16_t clt_prev = 0;
+    static float clt_prev = 0;
     if(data->clt == clt_prev) {
         return; 
     }
 
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d°C", data->clt);
+    snprintf(buf, sizeof(buf), "%d°C", (int)round(data->clt));
     lv_label_set_text(coolantTemp_label, buf);
 
     if(data->clt > 115) {

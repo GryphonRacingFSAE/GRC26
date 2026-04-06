@@ -3,6 +3,7 @@
 #define LV_CONF_INCLUDE_SIMPLE
 #include <lv_conf.h>
 #include <lvgl.h>
+#include <math.h>
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
@@ -30,13 +31,13 @@ void ui_tps_init () {
 }
 
 void ui_tps_update(const EcuData_t* data) {
-    static uint16_t tps_prev = 0;
+    static float tps_prev = 0;
     if(data->tps == tps_prev) {
         return; 
     }
 
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d%%", data->tps);
+    snprintf(buf, sizeof(buf), "%d%%", (int)round(data->tps));
     lv_label_set_text(throttle_label, buf);
     tps_prev = data->tps;
 }
