@@ -14,10 +14,10 @@ typedef struct {
     float wheelSpeed;
     float tps;
     float clt;
+    float batteryVoltage;
     float oilPressure;
     bool oilPressure_flag;
     uint8_t bp;
-    uint16_t apps;
 } EcuData_t;
 
 typedef struct {
