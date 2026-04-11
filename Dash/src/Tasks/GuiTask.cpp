@@ -14,6 +14,7 @@
 #include "UI/ui_rpm.h"
 #include "UI/ui_speed.h"
 #include "UI/ui_clt.h"
+#include "UI/ui_battery_voltage.h"
 #include "UI/ui_tps.h"
 #include "UI/ui_bp.h"
 
@@ -98,6 +99,7 @@ void GuiTask(void* pvParameters) {
         ui_rpm_init();
         ui_speed_init();
         ui_clt_init();
+        ui_battery_voltage_init();
         ui_tps_init();
         ui_bp_init();
         // Logo init 
@@ -135,6 +137,9 @@ void GuiTask(void* pvParameters) {
                 }
                 if(dataGui.clt != dataGui_prev.clt) {
                     ui_clt_update(&dataGui);
+                }
+                if(dataGui.battery_voltage != dataGui_prev.battery_voltage) {
+                    ui_battery_voltage_update(&dataGui);
                 }
                 if(dataGui.tps != dataGui_prev.tps) {
                     ui_tps_update(&dataGui);
