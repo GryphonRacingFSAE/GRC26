@@ -138,7 +138,7 @@ void GuiTask(void* pvParameters) {
                 if(dataGui.clt != dataGui_prev.clt) {
                     ui_clt_update(&dataGui);
                 }
-                if(dataGui.battery_voltage != dataGui_prev.battery_voltage) {
+                if(dataGui.batteryVoltage != dataGui_prev.batteryVoltage) {
                     ui_battery_voltage_update(&dataGui);
                 }
                 if(dataGui.tps != dataGui_prev.tps) {

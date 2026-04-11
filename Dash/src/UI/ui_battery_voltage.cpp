@@ -31,13 +31,13 @@ void ui_battery_voltage_init () {
 }
 
 void ui_battery_voltage_update(const EcuData_t* data) {
-    static float battery_voltage_prev = 0;
-    if(data->battery_voltage == battery_voltage_prev) {
+    static float batteryVoltage_prev = 0;
+    if(data->batteryVoltage == batteryVoltage_prev) {
         return; 
     }
 
     char buf[8];
-    snprintf(buf, sizeof(buf), "%.1fV", data->battery_voltage);
+    snprintf(buf, sizeof(buf), "%.1fV", data->batteryVoltage);
     lv_label_set_text(battery_voltage_label, buf);
-    battery_voltage_prev = data->battery_voltage;
+    batteryVoltage_prev = data->batteryVoltage;
 }
