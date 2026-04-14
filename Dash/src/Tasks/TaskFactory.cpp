@@ -34,9 +34,9 @@ void createTasks() {
 
     // 3. Tasks
     // GUI on Core 1 (App Core) is best for Rendering
-    xTaskCreatePinnedToCore(GuiTask, "GUI", 8192, (void*)&guiParams, 2, &guiTaskHandle, 1);
+    // xTaskCreatePinnedToCore(GuiTask, "GUI", 8192, (void*)&guiParams, 2, &guiTaskHandle, 1);
 
     // Logic on Core 0 or 1
-    xTaskCreate(DataAcqTask, "Data", 4096, (void*)&dataParams, 1, &dataTaskHandle);
+    // xTaskCreate(DataAcqTask, "Data", 4096, (void*)&dataParams, 1, &dataTaskHandle);
     xTaskCreate(PeripheralTask, "Periph", 2048, (void*)&periphParams, 1, &periphTaskHandle);
 }
