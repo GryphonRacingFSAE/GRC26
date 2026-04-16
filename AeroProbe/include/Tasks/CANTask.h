@@ -1,5 +1,5 @@
-#ifndef CANTASK_H
-#define CANTASK_H
+#ifndef CAN_TASK_H
+#define CAN_TASK_H
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -11,4 +11,4 @@ typedef struct {
 
 void CANTask(void* pvParameters);
 
-#endif // CANTASK_H
+#endif // CAN_TASK_H

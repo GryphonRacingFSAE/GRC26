@@ -1,5 +1,5 @@
-#ifndef PINDEFS_H
-#define PINDEFS_H
+#ifndef PIN_DEFS_H
+#define PIN_DEFS_H
 
 #include <stdint.h>
 
@@ -15,4 +15,4 @@ static constexpr int8_t BME680_CS = 18;
 static constexpr int8_t CAN_RX = 47;
 static constexpr int8_t CAN_TX = 48;
 
-#endif // PINDEFS_H
+#endif // PIN_DEFS_H

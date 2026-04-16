@@ -1,5 +1,5 @@
-#ifndef DATAACQTASK_H
-#define DATAACQTASK_H
+#ifndef DATA_ACQ_TASK_H
+#define DATA_ACQ_TASK_H
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -11,4 +11,4 @@ typedef struct {
 
 void DataAcqTask(void* pvParameters);
 
-#endif // DATAACQTASK_H
+#endif // DATA_ACQ_TASK_H

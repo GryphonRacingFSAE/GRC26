@@ -1,6 +1,6 @@
-#ifndef TASKFACTORY_H  
-#define TASKFACTORY_H
+#ifndef TASK_FACTORY_H  
+#define TASK_FACTORY_H
 
 void createTasks();
 
-#endif // TASKFACTORY_H
+#endif // TASK_FACTORY_H
