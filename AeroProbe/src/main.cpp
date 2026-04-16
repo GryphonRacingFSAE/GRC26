@@ -9,5 +9,5 @@ void setup() {
 }
 
 void loop() {
-  vTaskDelay(NULL);
+  vTaskDelete(NULL); // kill arduino loop, using RTOS scheduler 
 }
