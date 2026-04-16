@@ -62,7 +62,7 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
                 dataOut->oilPressure = oilPressure_raw * 0.1f;
                 break;
             }
-        case 0x525: // Brake Pressure
+        case 0x538: // Brake Pressure
             {
                 uint16_t bp_raw = (msg->data[1] << 8) | msg->data[0];
                 dataOut->bp = bp_raw;
