@@ -3,7 +3,6 @@
 #define LV_CONF_INCLUDE_SIMPLE
 #include <lv_conf.h>
 #include <lvgl.h>
-#include <math.h>
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
