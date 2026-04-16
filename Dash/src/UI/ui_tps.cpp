@@ -51,15 +51,15 @@ void ui_tps_init() {
 }
 
 void ui_tps_update(const EcuData_t* data) {
-    static uint16_t tps_prev = 0;
+    static float tps_prev = 0;
     if(data->tps == tps_prev) {
         return; 
     }
 
-    uint8_t val = (data->tps > 100) ? 100 : data->tps;
+    float val = (data->tps > 100.0f) ? 100.0f : data->tps;
  
     lv_bar_set_value(tps_bar, val, LV_ANIM_OFF);
-    lv_label_set_text_fmt(tps_label, "%d%%", val);
+    lv_label_set_text_fmt(tps_label, "%d%%", (int)val);
  
     lv_color_t col = (val < 50) ? lv_color_hex(0x00C853)   // green
                    : (val < 80) ? lv_color_hex(0xFFD600)   // amber
