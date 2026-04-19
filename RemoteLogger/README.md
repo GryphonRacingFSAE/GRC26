@@ -1,1 +1,0 @@
-Remote logger firmware and remote telemetry scripts
