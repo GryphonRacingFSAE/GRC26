@@ -1,6 +1,7 @@
 #ifndef PIN_DEFS_H
 #define PIN_DEFS_H
 
+#include <stdint.h>
 static constexpr int8_t LED_PIN = 4;
 
 static constexpr int8_t LORA_CS   = 16;
