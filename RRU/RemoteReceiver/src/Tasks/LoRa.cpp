@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <RadioLib.h>
-#include <LoRa.h>
+#include "LoRa.h"
 #include "AssertMsg.h"
 #include "PinDefs.h"   
 
