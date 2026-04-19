@@ -1,6 +1,6 @@
 #include <TaskFactory.h>
-#include <LoRa.h>
-#include <CAN.h>
+#include "LoRa.h"
+#include "CAN.h"
 #include <Arduino.h>
 
 static QueueHandle_t dataQueueHandle;
