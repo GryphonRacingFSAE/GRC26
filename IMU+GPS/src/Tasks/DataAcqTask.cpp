@@ -5,16 +5,22 @@
 #include <PinDefs.h> 
 
 #define DATA_TASK_PERIOD_MS 20
-#define IMU_SPI_FREQUENCY 4000000
+#define IMU_SPI_FREQUENCY 100000
 
 static ICM_20948_SPI imu;
 
 static void initIMU() {
+    pinMode(IMU_CS, OUTPUT);
+    digitalWrite(IMU_CS, HIGH);
+    delay(10);
+
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+    SPI.setDataMode(SPI_MODE3);
  
     Serial.println("[Data] Initializing ICM-20948...");
     while (true) {
         imu.begin(IMU_CS, SPI, IMU_SPI_FREQUENCY);
+        Serial.printf("[Data] WHO_AM_I = 0x%02X (expected 0xEA)\n", imu.getWhoAmI());
         if (imu.status == ICM_20948_Stat_Ok) {
             Serial.println("[Data] ICM-20948 OK");
             break;
@@ -39,9 +45,9 @@ void DataAcqTask(void* pvParameters) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
  
         IMUData_t imuData = {};
-        imu.getAGMT();
 
         if (imu.dataReady()) {
+            imu.getAGMT();
             imuData.updated = (imu.status == ICM_20948_Stat_Ok);
         }
  
@@ -52,6 +58,8 @@ void DataAcqTask(void* pvParameters) {
             imuData.gyro_x  = imu.gyrX();   
             imuData.gyro_y  = imu.gyrY();   
             imuData.gyro_z  = imu.gyrZ();  
+            Serial.println("[Data] IMU accel X = " + String(imuData.accel_x) + "`, Y = `" + String(imuData.accel_y) + "`, Z = `" + String(imuData.accel_z) + "`");
+            Serial.println("[Data] IMU gyro X = " + String(imuData.gyro_x) + "`, Y = `" + String(imuData.gyro_y) + "`, Z = `" + String(imuData.gyro_z) + "`");
         } else {
             Serial.println("[Data] WARNING: IMU not ready or read failed");
         }
