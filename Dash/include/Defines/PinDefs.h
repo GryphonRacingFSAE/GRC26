@@ -100,6 +100,9 @@ static constexpr int8_t LCD_B4    =  38;
 static constexpr int8_t LCD_B5    =  18;
 static constexpr int8_t LCD_B6    =  17;
 static constexpr int8_t LCD_B7    =  10;
+// CAN bus pins
+static constexpr int8_t LCD_CAN_TX = 15;
+static constexpr int8_t LCD_CAN_RX = 16; 
 // LED PINS
 // SDA pin on board
 static constexpr int8_t LED_DATA_PIN = 8;

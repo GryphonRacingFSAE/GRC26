@@ -81,7 +81,7 @@
 #include <freertos/semphr.h>
 
 typedef struct {
-    SemaphoreHandle_t* guiMutex;
+    QueueHandle_t* peripheralQueue;
 } PeripheralTaskParameters;
 
 void PeripheralTask(void* pvParameters);

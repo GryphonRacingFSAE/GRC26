@@ -7,6 +7,7 @@
 // Static Handles (Private)
 static SemaphoreHandle_t guiMutexHandle;
 static QueueHandle_t     dataQueueHandle;
+static QueueHandle_t     periphQueueHandle;
 
 static TaskHandle_t guiTaskHandle = NULL;
 static TaskHandle_t dataTaskHandle = NULL;
@@ -19,24 +20,25 @@ static PeripheralTaskParameters periphParams;
 
 void createTasks() {
     Serial.println("[Factory] Creating Tasks...");
-
     // 1. Objects
     guiMutexHandle = xSemaphoreCreateMutex();
-    dataQueueHandle = xQueueCreate(10, sizeof(int)); // Update sizeof() later
+    dataQueueHandle = xQueueCreate(10, sizeof(EcuData_t)); // Update sizeof() later
+    periphQueueHandle = xQueueCreate(10, sizeof(EcuData_t));
 
     // 2. Params
     guiParams.guiMutex = &guiMutexHandle;
     guiParams.dataQueue = &dataQueueHandle;
     
     dataParams.dataQueue = &dataQueueHandle;
+    dataParams.peripheralQueue = &periphQueueHandle;
     
-    periphParams.guiMutex = &guiMutexHandle;
+    periphParams.peripheralQueue = &periphQueueHandle;
 
     // 3. Tasks
     // GUI on Core 1 (App Core) is best for Rendering
-    // xTaskCreatePinnedToCore(GuiTask, "GUI", 8192, (void*)&guiParams, 2, &guiTaskHandle, 1);
+    xTaskCreatePinnedToCore(GuiTask, "GUI", 8192, (void*)&guiParams, 2, &guiTaskHandle, 1);
 
     // Logic on Core 0 or 1
-    // xTaskCreate(DataAcqTask, "Data", 4096, (void*)&dataParams, 1, &dataTaskHandle);
+    xTaskCreate(DataAcqTask, "Data", 4096, (void*)&dataParams, 1, &dataTaskHandle);
     xTaskCreate(PeripheralTask, "Periph", 2048, (void*)&periphParams, 1, &periphTaskHandle);
 }
