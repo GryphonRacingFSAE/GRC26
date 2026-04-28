@@ -14,9 +14,9 @@
 #include "UI/ui_rpm.h"
 #include "UI/ui_speed.h"
 #include "UI/ui_clt.h"
+#include "UI/ui_battery_voltage.h"
 #include "UI/ui_tps.h"
 #include "UI/ui_bp.h"
-#include "UI/ui_apps.h"
 
 #define GUI_TASK_PERIOD_MS 15 // 67Hz Refresh
 
@@ -99,9 +99,9 @@ void GuiTask(void* pvParameters) {
         ui_rpm_init();
         ui_speed_init();
         ui_clt_init();
+        ui_battery_voltage_init();
         ui_tps_init();
         ui_bp_init();
-        ui_apps_init();
         // Logo init 
         lv_obj_t* grc_logo = lv_img_create(lv_scr_act());
         lv_img_set_src(grc_logo, &banner);
@@ -138,14 +138,14 @@ void GuiTask(void* pvParameters) {
                 if(dataGui.clt != dataGui_prev.clt) {
                     ui_clt_update(&dataGui);
                 }
+                if(dataGui.batteryVoltage != dataGui_prev.batteryVoltage) {
+                    ui_battery_voltage_update(&dataGui);
+                }
                 if(dataGui.tps != dataGui_prev.tps) {
                     ui_tps_update(&dataGui);
                 }
                 if(dataGui.bp != dataGui_prev.bp) {
                     ui_bp_update(&dataGui);
-                }
-                if(dataGui.apps != dataGui_prev.apps) {
-                    ui_apps_update(&dataGui);
                 }
 
                 dataGui_prev = dataGui;
