@@ -9,7 +9,7 @@ static constexpr int16_t METER_W = 100;
 static constexpr int16_t METER_H = 400;
 static constexpr int16_t METER_RIGHT_X = 100;   
 static constexpr int16_t METER_SPACING = 50;
-static constexpr float BRAKE_PRES_MAX = 100.0f; 
+static constexpr float BRAKE_PRES_MAX = 100.0f; // did not confirm actual max
  
 static lv_obj_t* brake_bar   = nullptr;
 static lv_obj_t* brake_label = nullptr;
@@ -53,7 +53,7 @@ void ui_bp_init() {
 }
 
 void ui_bp_update(const EcuData_t* data) {
-    static uint8_t bp_prev = 0;
+    static uint16_t bp_prev = 0;
     if(data->bp == bp_prev) {
         return; 
     }

@@ -19,7 +19,7 @@ void ui_speed_init() {
     lv_label_set_text(speed_label, "0");
     lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_140, 0);
     lv_obj_set_style_text_color(speed_label, lv_color_white(), 0);
-    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, -(3*marginY));  
+    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, -2*marginY);  
 
     lv_obj_update_layout(speed_label);
 
