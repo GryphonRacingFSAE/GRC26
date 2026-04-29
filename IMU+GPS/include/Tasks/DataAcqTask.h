@@ -5,10 +5,16 @@
 #include <freertos/task.h>
 #include <freertos/queue.h>
 
+/* DataAcqTaskParameters
+ * @brief: Struct to hold parameters for the DataAcqTask, currently just a pointer to the queue handle for sending IMU data.
+*/
 typedef struct {
     QueueHandle_t* dataQueue;
 } DataAcqTaskParameters;
 
+/* IMUData_t
+ * @brief: Struct to hold the latest IMU data read from the ICM-20948. Contains accelerometer and gyroscope readings along with an "updated" flag.
+*/
 typedef struct {
     float accel_x;
     float accel_y;
@@ -19,6 +25,10 @@ typedef struct {
     bool updated;
 } IMUData_t;
 
+/* void DataAcqTask(void* pvParameters)
+ * @brief: FreeRTOS task function that continuously reads data from the ICM-20948 IMU and sends it to a queue for other tasks to consume.
+ * @param: pvParameters - Pointer to a DataAcqTaskParameters struct containing the queue handle for sending IMU data.
+*/
 void DataAcqTask(void* pvParameters);
 
 #endif // DATA_ACQ_TASK_H

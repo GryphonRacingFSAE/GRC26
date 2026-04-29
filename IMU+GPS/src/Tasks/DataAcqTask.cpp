@@ -9,6 +9,9 @@
 
 static ICM_20948_SPI imu;
 
+/* static void initIMU()
+ * @brief: Initializes the onboard ICM 20498 IMU. Retries until successful.
+*/
 static void initIMU() {
     pinMode(IMU_CS, OUTPUT);
     digitalWrite(IMU_CS, HIGH);
