@@ -22,12 +22,14 @@
  * @param: offset_0 - The first offset value.
  * @param: offset_1 - The second offset value.
  * @param: offset_2 - The third offset value.
+ * @param: offset_3 - The fourth offset value.
  * @param: scale_factor - The scale factor for the data.
  */
-static void packBytes(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float offset_2, float scale_factor) {
+static void packBytes(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor) {
     const int16_t data_0 = (int16_t)(offset_0 * scale_factor);
     const int16_t data_1 = (int16_t)(offset_1 * scale_factor);
     const int16_t data_2 = (int16_t)(offset_2 * scale_factor);
+    const int16_t data_3 = (int16_t)(offset_3 * scale_factor);
 
     buf[0] = (uint8_t)(data_0 & 0xFF);
     buf[1] = (uint8_t)((data_0 >> 8) & 0xFF);
@@ -35,8 +37,8 @@ static void packBytes(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, fl
     buf[3] = (uint8_t)((data_1 >> 8) & 0xFF);
     buf[4] = (uint8_t)(data_2 & 0xFF);
     buf[5] = (uint8_t)((data_2 >> 8) & 0xFF);
-    buf[6] = 0x00; 
-    buf[7] = 0x00; 
+    buf[6] = (uint8_t)(data_3 & 0xFF);
+    buf[7] = (uint8_t)((data_3 >> 8) & 0xFF);
 }
 
 /* static esp_err_t transmitFrame(uint32_t can_id, float offset_0, float offset_1, float offset_2, float scale_factor)
@@ -45,18 +47,19 @@ static void packBytes(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, fl
  * @param: offset_0 - The first offset value.
  * @param: offset_1 - The second offset value.
  * @param: offset_2 - The third offset value.
+ * @param: offset_3 - The fourth offset value.
  * @param: scale_factor - The scale factor for the data.
  * @return: ESP_OK if transmission was successful, otherwise an error code.
  */
-static esp_err_t transmitFrame(uint32_t can_id, float offset_0, float offset_1, float offset_2, float scale_factor) {
+static esp_err_t transmitFrame(uint32_t can_id, float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor) {
     uint8_t data[FRAME_LEN];
-    packBytes(data, offset_0, offset_1, offset_2, scale_factor);
+    packBytes(data, offset_0, offset_1, offset_2, offset_3, scale_factor);
 
     const twai_message_t msg = {
         .flags = 0,
         .identifier = can_id,
         .data_length_code = FRAME_LEN,
-        .data = {data[0], data[1], data[2], data[3], data[4], data[5], 0x00, 0x00}
+        .data = {data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]}
     };
 
     esp_err_t err = twai_transmit(&msg, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS));
@@ -93,23 +96,39 @@ void CANTask(void* pvParameters) {
     Serial.println("[CAN] Task Started");
 
     initCAN();
-    IMUData_t imuData;
+    SensorPacket_t packet;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(CAN_TASK_PERIOD_MS);
 
     for (;;) {
-        if(xQueueReceive(data_queue, &imuData, xFrequency) != pdTRUE) {
+        // Block until a packet arrives or the watchdog timeout expires.
+        // The task is purely queue-driven — no fixed period needed here.
+        if (xQueueReceive(data_queue, &packet, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS)) != pdTRUE) {
             continue;
         }
-
-        if(!imuData.updated) {
-            Serial.println("[CAN] WARNING: Received IMU data that is not updated");
-            continue;
+ 
+        switch (packet.type) {
+            case SENSOR_TYPE_IMU:
+                if (!packet.imu.updated) {
+                    Serial.println("[CAN] WARNING: Stale IMU packet, skipping");
+                    break;
+                }
+                transmitFrame(CAN_ID_IMU, packet.imu.accel_x, packet.imu.accel_y, packet.imu.accel_z, 0, IMU_SCALE_FACTOR);
+                break;
+ 
+            case SENSOR_TYPE_GPS:
+                if (!packet.gps.valid) {
+                    Serial.println("[CAN] WARNING: Invalid GPS packet, skipping");
+                    break;
+                }
+                transmitFrame(CAN_ID_GPS, packet.gps.latitude, packet.gps.longitude, packet.gps.speed, packet.gps.course, GPS_SCALE_FACTOR);
+                break;
+ 
+            default:
+                Serial.printf("[CAN] WARNING: Unknown packet type %d, skipping\n", packet.type);
+                break;
         }
-
-        transmitFrame(CAN_ID_IMU, imuData.accel_x, imuData.accel_y, imuData.accel_z, IMU_SCALE_FACTOR);
-        Serial.println("CAN Task");
         // TODO: Transmit data to CAN Bus here
         // xQueueSend(*params->dataQueue, &myPacket, 0);
     }

@@ -13,7 +13,7 @@ static CANTaskParameters canParams;
 
 void createTasks() {
     // 1. Object
-    dataQueueHandle = xQueueCreate(10, sizeof(IMUData_t)); // Update sizeof() later
+    dataQueueHandle = xQueueCreate(10, sizeof(SensorPacket_t)); // Update sizeof() later
 
     // 2. Params
     dataParams.dataQueue = &dataQueueHandle;

@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+static constexpr int8_t UART0_TX = 43;
+static constexpr int8_t UART0_RX = 44;
+
 static constexpr int8_t LED_ONBOARD = 4;
 
 static constexpr int8_t SPI_MOSI = 11;
