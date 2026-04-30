@@ -35,11 +35,11 @@ static void initIMU() {
     }
 }
 
-/* static void readIMU(IMUData_t& imuData)
- * @brief: Reads data from the ICM-20948 IMU and populates an IMUData_t struct. Sets the "updated" flag if new data was read successfully.
- * @param: imuData - Reference to an IMUData_t struct to populate with the latest IMU readings.
+/* static void readIMU(IMUGPSData_t& imuData)
+ * @brief: Reads data from the ICM-20948 IMU and populates an IMUGPSData_t struct. Sets the "updated" flag if new data was read successfully.
+ * @param: imuData - Reference to an IMUGPSData_t struct to populate with the latest IMU readings.
 */
-static void readIMU(IMUData_t& imuData) {
+static void readIMU(IMUGPSData_t& imuData) {
     imuData = {};
 
     if (imu.dataReady()) {
@@ -78,7 +78,7 @@ static void drainGPSSerial() {
     }
 }
 
-static bool buildGPSPacket(GPSData_t& gpsData) {
+static bool buildGPSPacket(IMUGPSData_t& gpsData) {
     gpsData = {};
 
     drainGPSSerial();
@@ -114,12 +114,15 @@ void DataAcqTask(void* pvParameters) {
     for (;;) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
  
-        SensorPacket_t packetIMU = { .type = SENSOR_TYPE_IMU };
-        readIMU(packetIMU.imu);
+        IMUGPSData_t packet = {};
+        readIMU(packet);
+        drainGPSSerial(); // Ensure we read all pending GPS bytes every iteration
 
-        if (xQueueSend(data_queue, &packetIMU, 0) != pdTRUE) {
-            Serial.println("[Data] WARNING: queue full, dropping IMU packet");
-        }
+        if (buildGPSPacket(packet)) {
+            if (xQueueSend(data_queue, &packet, 0) != pdTRUE) {
+                Serial.println("[Data] WARNING: queue full, dropping IMU+GPS packet");
+            }
+        }  
         
         // drainGPSSerial(); // Ensure we read all pending GPS bytes every iteration
 

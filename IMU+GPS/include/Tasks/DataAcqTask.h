@@ -14,6 +14,7 @@ typedef struct {
 
 /* IMUData_t
  * @brief: Struct to hold the latest IMU data read from the ICM-20948. Contains accelerometer and gyroscope readings along with an "updated" flag.
+ * Note: Accel units: milli g's, Gyro (for testing) units: degrees per second, Latitude/Longitude units: degrees, Speed units: km/h, Course units: degrees
 */
 typedef struct {
     float accel_x;
@@ -22,39 +23,21 @@ typedef struct {
     float gyro_x;
     float gyro_y;
     float gyro_z;
-    bool updated;
-} IMUData_t;
-
-/* GPSData_t
- * @brief: Struct to hold the latest GPS data read from the TinyGPS++ library.
-*/
-typedef struct {
     float latitude;
     float longitude;
     float speed;
     float course;
     bool valid;
     bool updated;
-} GPSData_t;
+} IMUGPSData_t;
 
-/* SensorType_t
- * @brief: Enum to represent the type of sensor data to be enqueued.
-*/
-typedef enum {
-    SENSOR_TYPE_IMU,
-    SENSOR_TYPE_GPS
-} SensorType_t;
-
-/* SensorPacket_t
- * @brief: Tagged union passed through the single sensor queue. Inspect "type" first, then read the matching union member.
+/* GPSData_t
+ * @brief: Struct to hold the latest GPS data read from the TinyGPS++ library.
 */
 typedef struct {
-    SensorType_t type;
-    union {
-        IMUData_t imu;
-        GPSData_t gps;
-    };
-} SensorPacket_t;
+
+    bool updated;
+} GPSData_t;
 
 /* void DataAcqTask(void* pvParameters)
  * @brief: FreeRTOS task function that continuously reads data from the ICM-20948 IMU and sends it to a queue for other tasks to consume.

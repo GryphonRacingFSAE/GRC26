@@ -96,39 +96,23 @@ void CANTask(void* pvParameters) {
     Serial.println("[CAN] Task Started");
 
     initCAN();
-    SensorPacket_t packet;
+    IMUGPSData_t packet;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(CAN_TASK_PERIOD_MS);
 
     for (;;) {
-        // Block until a packet arrives or the watchdog timeout expires.
-        // The task is purely queue-driven — no fixed period needed here.
         if (xQueueReceive(data_queue, &packet, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS)) != pdTRUE) {
             continue;
         }
- 
-        switch (packet.type) {
-            case SENSOR_TYPE_IMU:
-                if (!packet.imu.updated) {
-                    Serial.println("[CAN] WARNING: Stale IMU packet, skipping");
-                    break;
-                }
-                transmitFrame(CAN_ID_IMU, packet.imu.accel_x, packet.imu.accel_y, packet.imu.accel_z, 0, IMU_SCALE_FACTOR);
-                break;
- 
-            case SENSOR_TYPE_GPS:
-                if (!packet.gps.valid) {
-                    Serial.println("[CAN] WARNING: Invalid GPS packet, skipping");
-                    break;
-                }
-                transmitFrame(CAN_ID_GPS, packet.gps.latitude, packet.gps.longitude, packet.gps.speed, packet.gps.course, GPS_SCALE_FACTOR);
-                break;
- 
-            default:
-                Serial.printf("[CAN] WARNING: Unknown packet type %d, skipping\n", packet.type);
-                break;
+
+        if(!packet.updated) {
+            Serial.println("[CAN] WARNING: Stale data");
+            continue;
         }
+
+        transmitFrame(CAN_ID_IMU, packet.accel_x, packet.accel_y, packet.accel_z, packet.gyro_x, IMU_SCALE_FACTOR);
+        transmitFrame(CAN_ID_GPS, packet.latitude, packet.longitude, packet.speed, packet.course, GPS_SCALE_FACTOR);
         // TODO: Transmit data to CAN Bus here
         // xQueueSend(*params->dataQueue, &myPacket, 0);
     }
