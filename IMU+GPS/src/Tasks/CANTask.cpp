@@ -111,7 +111,7 @@ void CANTask(void* pvParameters) {
             continue;
         }
 
-        transmitFrame(CAN_ID_IMU, packet.accel_x, packet.accel_y, packet.accel_z, packet.gyro_x, IMU_SCALE_FACTOR);
+        transmitFrame(CAN_ID_IMU, packet.accel_x, packet.accel_y, packet.accel_z, 0, IMU_SCALE_FACTOR);
         transmitFrame(CAN_ID_GPS, packet.latitude, packet.longitude, packet.speed, packet.course, GPS_SCALE_FACTOR);
         // TODO: Transmit data to CAN Bus here
         // xQueueSend(*params->dataQueue, &myPacket, 0);
