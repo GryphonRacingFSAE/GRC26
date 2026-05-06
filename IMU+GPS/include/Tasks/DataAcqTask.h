@@ -28,7 +28,8 @@ typedef struct {
     float speed;
     float course;
     bool valid;
-    bool updated;
+    bool imu_updated;
+    bool gps_updated;
 } IMUGPSData_t;
 
 /* GPSData_t

@@ -27,7 +27,6 @@ static void initIMU() {
         imu.begin(IMU_CS, SPI, IMU_SPI_FREQUENCY);
         Serial.printf("[Data] WHO_AM_I = 0x%02X (expected 0xEA)\n", imu.getWhoAmI());
         if (imu.status == ICM_20948_Stat_Ok) {
-            Serial.println("[Data] ICM-20948 OK");
             break;
         }
         Serial.printf("[Data] IMU init failed (%s), retrying in 500 ms...\n", imu.statusString());
@@ -40,22 +39,21 @@ static void initIMU() {
  * @param: imuData - Reference to an IMUGPSData_t struct to populate with the latest IMU readings.
 */
 static void readIMU(IMUGPSData_t& imuData) {
-    imuData = {};
-
+    imuData = { .accel_x = 0, .accel_y = 0, .accel_z = 0, .gyro_x = 0, .gyro_y = 0, .gyro_z = 0, .imu_updated = false};
     if (imu.dataReady()) {
         imu.getAGMT();
-        imuData.updated = (imu.status == ICM_20948_Stat_Ok);
+        imuData.imu_updated = (imu.status == ICM_20948_Stat_Ok);
     }
  
-    if (imuData.updated) {
+    if (imuData.imu_updated) {
         imuData.accel_x = imu.accX();    
         imuData.accel_y = imu.accY();    
         imuData.accel_z = imu.accZ();    
         imuData.gyro_x  = imu.gyrX();   
         imuData.gyro_y  = imu.gyrY();   
         imuData.gyro_z  = imu.gyrZ();  
-        Serial.println("[Data] IMU accel X = " + String(imuData.accel_x) + "`, Y = `" + String(imuData.accel_y) + "`, Z = `" + String(imuData.accel_z) + "`");
-        Serial.println("[Data] IMU gyro X = " + String(imuData.gyro_x) + "`, Y = `" + String(imuData.gyro_y) + "`, Z = `" + String(imuData.gyro_z) + "`");
+        Serial.println("[Data] IMU accel X = " + String(imuData.accel_x) + ", Y = " + String(imuData.accel_y) + ", Z = " + String(imuData.accel_z) + "");
+        Serial.println("[Data] IMU gyro X = " + String(imuData.gyro_x) + ", Y = " + String(imuData.gyro_y) + ", Z = " + String(imuData.gyro_z) + "");
     } else {
         Serial.println("[Data] WARNING: IMU not ready or read failed");
     }
@@ -65,7 +63,7 @@ static void readIMU(IMUGPSData_t& imuData) {
  * @brief: Initializes the GPS module by starting the serial communication on the appropriate pins.
 */    
 static void initGPS() {
-    Serial0.begin(9600, SERIAL_8N1, UART0_RX, UART0_RX);
+    Serial0.begin(9600, SERIAL_8N1, UART0_RX, UART0_TX);
     Serial.println("[Data] Initializing GPS...");
 }
 
@@ -79,13 +77,13 @@ static void drainGPSSerial() {
 }
 
 static bool buildGPSPacket(IMUGPSData_t& gpsData) {
-    gpsData = {};
+    gpsData = { .latitude = 0, .longitude = 0, .speed = 0, .course = 0, .valid = false, .gps_updated = false };
 
-    drainGPSSerial();
+    drainGPSSerial(); 
 
     gpsData.valid = gps.location.isValid() && (gps.location.age() < 2000); // Consider location valid if it's been updated in the last 2 seconds
 
-    if (gpsData.valid) {
+     if (gpsData.valid) {
         gpsData.latitude = (float)gps.location.lat();
         gpsData.longitude = (float)gps.location.lng();
         gpsData.speed = gps.speed.isValid() ? (float)gps.speed.kmph() : 0.0f;
@@ -95,8 +93,8 @@ static bool buildGPSPacket(IMUGPSData_t& gpsData) {
         Serial.println("[Data] WARNING: GPS data invalid");
     }
 
-    gpsData.updated = gps.location.isUpdated(); 
-    return gpsData.updated;
+    gpsData.gps_updated = gps.location.isUpdated(); 
+    return gpsData.gps_updated;
 }
 
 void DataAcqTask(void* pvParameters) {
@@ -122,15 +120,10 @@ void DataAcqTask(void* pvParameters) {
             if (xQueueSend(data_queue, &packet, 0) != pdTRUE) {
                 Serial.println("[Data] WARNING: queue full, dropping IMU+GPS packet");
             }
-        }  
-        
-        // drainGPSSerial(); // Ensure we read all pending GPS bytes every iteration
 
-        // SensorPacket_t packetGPS = { .type = SENSOR_TYPE_GPS };
-        // if (buildGPSPacket(packetGPS.gps)) {
-        //     if (xQueueSend(data_queue, &packetGPS, 0) != pdTRUE) {
-        //         Serial.println("[Data] WARNING: queue full, dropping GPS packet");
-        //     }
-        // }
+            Serial.println("[IMU] accel X = " + String(packet.accel_x) + ", Y = " + String(packet.accel_y) + ", Z = " + String(packet.accel_z) + "");
+            Serial.println("[IMU] gyro X = " + String(packet.gyro_x) + ", Y = " + String(packet.gyro_y) + ", Z = " + String(packet.gyro_z) + "");
+            Serial.println("[GPS] lat = " + String(packet.latitude, 6) + ", lng = " + String(packet.longitude, 6) + "speed = " + String(packet.speed) + " km/h, course = " + String(packet.course) + " deg, valid = " + String(packet.valid));
+        }  
     }
 }

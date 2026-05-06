@@ -106,7 +106,7 @@ void CANTask(void* pvParameters) {
             continue;
         }
 
-        if(!packet.updated) {
+        if(!packet.imu_updated || !packet.gps_updated) {
             Serial.println("[CAN] WARNING: Stale data");
             continue;
         }
