@@ -1,22 +1,27 @@
 #include <Arduino.h>
+#include <RadioLib.h>
 #include "LoRa.h"
 #include "AssertMsg.h"
 #include "LoRaAPI.h"
 
-#define LORA_TASK_PERIOD_MS      1000
+#define LORA_TASK_PERIOD_MS      5
+#define LORA_TX_PERIOD_MS        1000
 #define LORA_RX_TIMEOUT_MS       5000
 
 // true  = TX board
 // false = RX board
 static constexpr bool LORA_ROLE_TX = false;
 
-static void LoRaTxLoop()
-{
-    static uint32_t txCount = 0;
+static bool txActive = false;
+static bool rxActive = false;
 
+static uint32_t lastTxMs = 0;
+static uint32_t txCount = 0;
+
+static void BuildTelemetryPayload(char* payload, size_t payloadSize)
+{
     uint32_t nowMs = millis();
 
-    // Fake test data for now
     uint16_t rpm = 2500 + ((txCount * 137) % 5000);
 
     float apps = txCount * 3.7f;
@@ -30,11 +35,9 @@ static void LoRaTxLoop()
 
     const char* stateStr = "RUN";
 
-    char payload[192];
-
     snprintf(
         payload,
-        sizeof(payload),
+        payloadSize,
         "TEL|seq=%lu|ms=%lu|rpm=%u|apps=%.1f|brake=%.1f|temp=%.1f|vbat=%.2f|state=%s",
         static_cast<unsigned long>(txCount),
         static_cast<unsigned long>(nowMs),
@@ -45,13 +48,47 @@ static void LoRaTxLoop()
         batteryVoltage,
         stateStr
     );
+}
 
-    txCount++;
+static void LoRaTxTaskPoll()
+{
+    if (!txActive) {
+        uint32_t nowMs = millis();
 
-    Serial.print("[LoRaTask][TX] Transmitting: ");
-    Serial.println(payload);
+        if ((uint32_t)(nowMs - lastTxMs) < LORA_TX_PERIOD_MS) {
+            return;
+        }
 
-    int16_t state = LoRaApiTransmit(payload);
+        char payload[192];
+
+        BuildTelemetryPayload(payload, sizeof(payload));
+
+        Serial.print("[LoRaTask][TX] Starting TX: ");
+        Serial.println(payload);
+
+        int16_t state = LoRaApiStartTransmit(payload);
+
+        if (state == RADIOLIB_ERR_NONE) {
+            txActive = true;
+            lastTxMs = nowMs;
+            txCount++;
+        } else if (state == LORA_API_BUSY) {
+            // Radio is busy; try again next task tick.
+        } else {
+            Serial.print("[LoRaTask][TX] start failed: ");
+            Serial.println(state);
+        }
+
+        return;
+    }
+
+    int16_t state = LoRaApiPollTransmit();
+
+    if (state == LORA_API_BUSY) {
+        return;
+    }
+
+    txActive = false;
 
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println("[LoRaTask][TX] TX done");
@@ -61,13 +98,33 @@ static void LoRaTxLoop()
     }
 }
 
-static void LoRaRxLoop()
+static void LoRaRxTaskPoll()
 {
+    if (!rxActive) {
+        Serial.println("[LoRaTask][RX] Starting RX window...");
+
+        int16_t state = LoRaApiStartReceive(LORA_RX_TIMEOUT_MS);
+
+        if (state == RADIOLIB_ERR_NONE) {
+            rxActive = true;
+        } else if (state == LORA_API_BUSY) {
+            // Radio is busy; try again next task tick.
+        } else {
+            Serial.print("[LoRaTask][RX] start failed: ");
+            Serial.println(state);
+        }
+
+        return;
+    }
+
     String received;
+    int16_t state = LoRaApiPollReceive(received);
 
-    Serial.println("[LoRaTask][RX] Waiting for packet...");
+    if (state == LORA_API_BUSY) {
+        return;
+    }
 
-    int16_t state = LoRaApiReceive(received, LORA_RX_TIMEOUT_MS);
+    rxActive = false;
 
     if (state == RADIOLIB_ERR_NONE) {
         Serial.println("=============================");
@@ -109,6 +166,7 @@ void LoRaTask(void* pvParameters)
     Serial.println("[LoRaTask] Starting LoRa task...");
 
     int16_t state = LoRaApiInit(LORA_ROLE_TX);
+
     ASSERT_MSG(
         state == RADIOLIB_ERR_NONE,
         "[LoRaTask] LoRaApiInit failed: " + String(state)
@@ -116,9 +174,9 @@ void LoRaTask(void* pvParameters)
 
     for (;;) {
         if (LORA_ROLE_TX) {
-            LoRaTxLoop();
+            LoRaTxTaskPoll();
         } else {
-            LoRaRxLoop();
+            LoRaRxTaskPoll();
         }
 
         vTaskDelay(pdMS_TO_TICKS(LORA_TASK_PERIOD_MS));

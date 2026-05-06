@@ -23,6 +23,20 @@ static LR1121 radio = new Module(
     loraSPI
 );
 
+enum class LoRaApiOp {
+    Idle,
+    Tx,
+    Rx
+};
+
+static LoRaApiOp currentOp = LoRaApiOp::Idle;
+
+static uint32_t txStartUs = 0;
+static RadioLibTime_t txTimeoutUs = 0;
+
+static uint32_t rxStartMs = 0;
+static uint32_t rxTimeoutMs = 0;
+
 static constexpr uint32_t LORA_IRQ_MASK_ALL =
     RADIOLIB_LR11X0_IRQ_TX_DONE |
     RADIOLIB_LR11X0_IRQ_RX_DONE |
@@ -99,6 +113,8 @@ static int16_t LoRaApiConfigureRfSwitch()
 
 int16_t LoRaApiInit(bool txRole)
 {
+    currentOp = LoRaApiOp::Idle;
+
     loraSPI.begin(SPI_CLK, SPI_MISO, SPI_MOSI, LORA_CS);
 
     int16_t state = radio.begin(
@@ -136,7 +152,7 @@ int16_t LoRaApiInit(bool txRole)
     Serial.println("  CR:        4/7");
     Serial.println("  Power:     5 dBm");
     Serial.println("  TCXO:      1.6 V");
-    Serial.println("  IRQ mode:  SPI polling, DIO9 not routed");
+    Serial.println("  IRQ mode:  Non-blocking SPI polling");
 
     if (txRole) {
         Serial.println("  Role:      TX");
@@ -147,13 +163,21 @@ int16_t LoRaApiInit(bool txRole)
     return RADIOLIB_ERR_NONE;
 }
 
-int16_t LoRaApiTransmit(const char* payload)
+bool LoRaApiIsBusy()
 {
-    if (payload == nullptr) {
-        return RADIOLIB_ERR_UNKNOWN;
+    return currentOp != LoRaApiOp::Idle;
+}
+
+int16_t LoRaApiStartTransmit(const char* payload)
+{
+    if (LoRaApiIsBusy()) {
+        return LORA_API_BUSY;
     }
 
-    const uint8_t* data = reinterpret_cast<const uint8_t*>(payload);
+    if (payload == nullptr) {
+        return RADIOLIB_ERR_NONE;
+    }
+
     const size_t len = strlen(payload);
 
     if (len == 0) {
@@ -164,154 +188,176 @@ int16_t LoRaApiTransmit(const char* payload)
         return RADIOLIB_ERR_PACKET_TOO_LONG;
     }
 
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(payload);
+
     int16_t state = radio.standby();
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.print("[LoRaAPI][TX] standby failed: ");
-        Serial.println(state);
         return state;
     }
 
     state = radio.clearIrqFlags(LORA_IRQ_MASK_ALL);
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.print("[LoRaAPI][TX] clearIrqFlags failed: ");
-        Serial.println(state);
         return state;
     }
 
     state = radio.startTransmit(data, len);
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.print("[LoRaAPI][TX] startTransmit failed: ");
-        Serial.println(state);
         return state;
     }
 
-    RadioLibTime_t timeoutUs = radio.getTimeOnAir(len);
-    timeoutUs = (timeoutUs * 3) / 2;
-    timeoutUs += 500000UL;
+    txStartUs = micros();
 
-    const uint32_t startUs = micros();
+    txTimeoutUs = radio.getTimeOnAir(len);
+    txTimeoutUs = (txTimeoutUs * 3) / 2;
+    txTimeoutUs += 500000UL;
 
-    for (;;) {
-        uint32_t irq = radio.getIrqFlags();
+    currentOp = LoRaApiOp::Tx;
 
-        if (irq & RADIOLIB_LR11X0_IRQ_TX_DONE) {
-            state = radio.finishTransmit();
-
-            if (state != RADIOLIB_ERR_NONE) {
-                Serial.print("[LoRaAPI][TX] finishTransmit failed: ");
-                Serial.println(state);
-            }
-
-            return state;
-        }
-
-        if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
-            Serial.println("[LoRaAPI][TX] radio IRQ timeout");
-            LoRaApiPrintIrqFlags(irq);
-            radio.finishTransmit();
-            return RADIOLIB_ERR_TX_TIMEOUT;
-        }
-
-        if ((uint32_t)(micros() - startUs) > timeoutUs) {
-            Serial.println("[LoRaAPI][TX] software TX timeout");
-            LoRaApiPrintIrqFlags(irq);
-            radio.finishTransmit();
-            return RADIOLIB_ERR_TX_TIMEOUT;
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(LORA_POLL_PERIOD_MS));
-    }
+    return RADIOLIB_ERR_NONE;
 }
 
-int16_t LoRaApiReceive(String& received, uint32_t timeoutMs)
+int16_t LoRaApiPollTransmit()
 {
-    received = "";
+    if (currentOp != LoRaApiOp::Tx) {
+        return RADIOLIB_ERR_NONE;
+    }
+
+    uint32_t irq = radio.getIrqFlags();
+
+    if (irq & RADIOLIB_LR11X0_IRQ_TX_DONE) {
+        int16_t state = radio.finishTransmit();
+        currentOp = LoRaApiOp::Idle;
+        return state;
+    }
+
+    if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
+        Serial.println("[LoRaAPI][TX] radio IRQ timeout");
+        LoRaApiPrintIrqFlags(irq);
+
+        radio.finishTransmit();
+        currentOp = LoRaApiOp::Idle;
+
+        return RADIOLIB_ERR_TX_TIMEOUT;
+    }
+
+    if ((uint32_t)(micros() - txStartUs) > txTimeoutUs) {
+        Serial.println("[LoRaAPI][TX] software TX timeout");
+        LoRaApiPrintIrqFlags(irq);
+
+        radio.finishTransmit();
+        currentOp = LoRaApiOp::Idle;
+
+        return RADIOLIB_ERR_TX_TIMEOUT;
+    }
+
+    return LORA_API_BUSY;
+}
+
+int16_t LoRaApiStartReceive(uint32_t timeoutMs)
+{
+    if (LoRaApiIsBusy()) {
+        return LORA_API_BUSY;
+    }
 
     int16_t state = radio.standby();
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.print("[LoRaAPI][RX] standby failed: ");
-        Serial.println(state);
         return state;
     }
 
     state = radio.clearIrqFlags(LORA_IRQ_MASK_ALL);
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.print("[LoRaAPI][RX] clearIrqFlags failed: ");
-        Serial.println(state);
         return state;
     }
 
     state = radio.startReceive();
     if (state != RADIOLIB_ERR_NONE) {
-        Serial.print("[LoRaAPI][RX] startReceive failed: ");
-        Serial.println(state);
         return state;
     }
 
-    const uint32_t startMs = millis();
+    rxStartMs = millis();
+    rxTimeoutMs = timeoutMs;
 
-    for (;;) {
-        uint32_t irq = radio.getIrqFlags();
+    currentOp = LoRaApiOp::Rx;
 
-        if (irq & RADIOLIB_LR11X0_IRQ_RX_DONE) {
-            uint8_t buffer[RADIOLIB_LR11X0_MAX_PACKET_LENGTH + 1] = { 0 };
+    return RADIOLIB_ERR_NONE;
+}
 
-            size_t len = radio.getPacketLength();
+int16_t LoRaApiPollReceive(String& received)
+{
+    received = "";
 
-            if (len > RADIOLIB_LR11X0_MAX_PACKET_LENGTH) {
-                len = RADIOLIB_LR11X0_MAX_PACKET_LENGTH;
-            }
-
-            state = radio.readData(buffer, len);
-            int16_t finishState = radio.finishReceive();
-
-            if (state == RADIOLIB_ERR_NONE) {
-                buffer[len] = '\0';
-                received = String(reinterpret_cast<char*>(buffer));
-                return RADIOLIB_ERR_NONE;
-            }
-
-            if (state == RADIOLIB_ERR_CRC_MISMATCH) {
-                Serial.println("[LoRaAPI][RX] CRC mismatch from readData");
-                return state;
-            }
-
-            if (finishState != RADIOLIB_ERR_NONE) {
-                Serial.print("[LoRaAPI][RX] finishReceive failed: ");
-                Serial.println(finishState);
-            }
-
-            return state;
-        }
-
-        if (irq & RADIOLIB_LR11X0_IRQ_CRC_ERR) {
-            Serial.println("[LoRaAPI][RX] CRC error IRQ");
-            LoRaApiPrintIrqFlags(irq);
-            radio.finishReceive();
-            return RADIOLIB_ERR_CRC_MISMATCH;
-        }
-
-        if (irq & RADIOLIB_LR11X0_IRQ_HEADER_ERR) {
-            Serial.println("[LoRaAPI][RX] header error IRQ");
-            LoRaApiPrintIrqFlags(irq);
-            radio.finishReceive();
-            return RADIOLIB_ERR_CRC_MISMATCH;
-        }
-
-        if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
-            Serial.println("[LoRaAPI][RX] radio RX timeout IRQ");
-            LoRaApiPrintIrqFlags(irq);
-            radio.finishReceive();
-            return RADIOLIB_ERR_RX_TIMEOUT;
-        }
-
-        if ((uint32_t)(millis() - startMs) > timeoutMs) {
-            radio.finishReceive();
-            return RADIOLIB_ERR_RX_TIMEOUT;
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(LORA_POLL_PERIOD_MS));
+    if (!LoRaApiIsBusy()) {
+        return RADIOLIB_ERR_NONE;
     }
+
+    uint32_t irq = radio.getIrqFlags();
+
+    if (irq & RADIOLIB_LR11X0_IRQ_RX_DONE) {
+        uint8_t buffer[RADIOLIB_LR11X0_MAX_PACKET_LENGTH + 1] = { 0 };
+
+        size_t len = radio.getPacketLength();
+
+        if (len > RADIOLIB_LR11X0_MAX_PACKET_LENGTH) {
+            len = RADIOLIB_LR11X0_MAX_PACKET_LENGTH;
+        }
+
+        int16_t state = radio.readData(buffer, len);
+        int16_t finishState = radio.finishReceive();
+
+        currentOp = LoRaApiOp::Idle;
+
+        if (state == RADIOLIB_ERR_NONE) {
+            buffer[len] = '\0';
+            received = String(reinterpret_cast<char*>(buffer));
+            return RADIOLIB_ERR_NONE;
+        }
+
+        if (finishState != RADIOLIB_ERR_NONE) {
+            Serial.print("[LoRaAPI][RX] finishReceive failed: ");
+            Serial.println(finishState);
+        }
+
+        return state;
+    }
+
+    if (irq & RADIOLIB_LR11X0_IRQ_CRC_ERR) {
+        Serial.println("[LoRaAPI][RX] CRC error IRQ");
+        LoRaApiPrintIrqFlags(irq);
+
+        radio.finishReceive();
+        currentOp = LoRaApiOp::Idle;
+
+        return RADIOLIB_ERR_CRC_MISMATCH;
+    }
+
+    if (irq & RADIOLIB_LR11X0_IRQ_HEADER_ERR) {
+        Serial.println("[LoRaAPI][RX] header error IRQ");
+        LoRaApiPrintIrqFlags(irq);
+
+        radio.finishReceive();
+        currentOp = LoRaApiOp::Idle;
+
+        return RADIOLIB_ERR_CRC_MISMATCH;
+    }
+
+    if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
+        Serial.println("[LoRaAPI][RX] radio RX timeout IRQ");
+        LoRaApiPrintIrqFlags(irq);
+
+        radio.finishReceive();
+        currentOp = LoRaApiOp::Idle;
+
+        return RADIOLIB_ERR_RX_TIMEOUT;
+    }
+
+    if ((uint32_t)(millis() - rxStartMs) > rxTimeoutMs) {
+        radio.finishReceive();
+        currentOp = LoRaApiOp::Idle;
+
+        return RADIOLIB_ERR_RX_TIMEOUT;
+    }
+
+    return LORA_API_BUSY;
 }
 
 float LoRaApiGetRSSI()
