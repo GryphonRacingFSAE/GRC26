@@ -21,5 +21,5 @@ void createTasks() {
 
     // 3. Tasks
     xTaskCreate(LoRaTask, "LoRaTask", 4096, (void*)&loraParams, 1, &loraTaskHandle);
-    xTaskCreate(CANTask, "CANTask", 4096, (void*)&canParams, 1, &canTaskHandle);
+    // xTaskCreate(CANTask, "CANTask", 4096, (void*)&canParams, 1, &canTaskHandle);
 }

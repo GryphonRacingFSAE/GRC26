@@ -1,0 +1,268 @@
+VERSION "Sep 29, 2020"
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: MaxxECU
+
+
+BO_ 1346 MSG_0x542: 8 MaxxECU
+ SG_ Spare_0x542_6 : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ Spare_0x542_4 : 32|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ VVT_exhaust_cam_target : 16|16@1- (0.1,0) [0|0] "angle:deg" Vector__XXX
+ SG_ VVT_intake_cam_target : 0|16@1- (0.1,0) [0|0] "angle:deg" Vector__XXX
+
+BO_ 1337 MSG_0x539: 8 MaxxECU
+ SG_ User_Channel_8 : 48|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_7 : 32|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_6 : 16|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_5 : 0|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+
+BO_ 1344 MSG_0x540: 8 MaxxECU
+ SG_ Differential_Temp : 48|16@1+ (0.1,0) [0|6553.5] "temperature:C" Vector__XXX
+ SG_ Transmission_Temp : 32|16@1+ (0.1,0) [0|6553.5] "temperature:C" Vector__XXX
+ SG_ Virtual_fuel_tank : 16|16@1+ (0.1,0) [0|6553.5] "L" Vector__XXX
+ SG_ Active_Tune_Selector : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ Active_boost_table : 0|8@1+ (1,0) [0|255] "" Vector__XXX
+
+BO_ 1345 MSG_0x541: 8 MaxxECU
+ SG_ VVT_exhaust_cam2_position : 48|16@1- (0.1,0) [0|0] "angle:deg" Vector__XXX
+ SG_ VVT_intake_cam2_position : 32|16@1- (0.1,0) [0|0] "angle:deg" Vector__XXX
+ SG_ VVT_exhaust_cam1_position : 16|16@1- (0.1,0) [0|0] "angle:deg" Vector__XXX
+ SG_ VVT_intake_cam1_position : 0|16@1- (0.1,0) [0|0] "angle:deg" Vector__XXX
+
+BO_ 1336 MSG_0x538: 8 MaxxECU
+ SG_ User_Channel_4 : 48|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_3 : 32|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_2 : 16|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_1 : 0|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+
+BO_ 1320 MSG_0x528: 8 MaxxECU
+ SG_ Knock_last_cylinder : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ Knock_count : 32|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ Knock_correction : 16|16@1+ (0.1,0) [0|6553.5] "angle:deg" Vector__XXX
+ SG_ Knock_Level_All_peak : 0|16@1+ (1,0) [0|65535] "" Vector__XXX
+
+BO_ 1319 MSG_0x527: 8 MaxxECU
+ SG_ Lambda_Target : 48|16@1- (0.001,0) [-32.768|32.767] "afr:LA" Vector__XXX
+ SG_ Acc_Up : 32|16@1- (0.01,0) [-327.68|327.67] "G" Vector__XXX
+ SG_ Acc_Right : 16|16@1- (0.01,0) [-327.68|327.67] "G" Vector__XXX
+ SG_ Acc_forward : 0|16@1- (0.01,0) [-327.68|327.67] "G" Vector__XXX
+
+BO_ 1318 MSG_0x526: 8 MaxxECU
+ SG_ Spare_0x526_6 : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ RevLimit_RPM : 32|16@1+ (1,0) [0|65535] "rpm" Vector__XXX
+ SG_ Spare_0x526_2 : 16|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ Spare_status_bit : 15|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Nitrous_active : 14|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ECU_is_logging : 13|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ User_cut_active : 12|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ GP_limiter_active : 11|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Speed_limit_active : 10|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Clutch_pedal_active : 9|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Brake_pedal_active : 8|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Knock_detected : 7|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ AC_idle_up_active : 6|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Throttle_blip_active : 5|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ TracControl_power_limiter_active : 4|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Launch_control_active : 3|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Antilag_active : 2|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Revlimit_active : 1|1@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ Shiftcut_active : 0|1@1+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 1317 MSG_0x525: 8 MaxxECU
+ SG_ User_Channel_12 : 48|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_11 : 32|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_10 : 16|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ User_Channel_9 : 0|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+
+BO_ 1335 MSG_0x537: 8 MaxxECU
+ SG_ Boost_Target : 48|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ Coolant_Pressure : 32|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ Wastegate_Pressure : 16|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ Fuel_Pressure_1 : 0|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+
+BO_ 1312 MSG_0x520: 8 MaxxECU
+ SG_ EngineSpeed : 0|16@1+ (1,0) [0|65535] "rpm" Vector__XXX
+ SG_ ThrottlePos : 16|16@1+ (0.1,0) [0|100] "fraction:%" Vector__XXX
+ SG_ MAP : 32|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ Lambda_Average : 48|16@1+ (0.001,0) [0|65.535] "afr:LA" Vector__XXX
+
+BO_ 1313 MSG_0x521: 8 MaxxECU
+ SG_ Lambda_A : 0|16@1+ (0.001,0) [0|65.535] "afr:LA" Vector__XXX
+ SG_ Lambda_B : 16|16@1+ (0.001,0) [0|65.535] "afr:LA" Vector__XXX
+ SG_ Ignition_Timing : 32|16@1+ (0.1,0) [0|6553.5] "angle:deg" Vector__XXX
+ SG_ IgnitionCut : 48|16@1+ (1,0) [0|100] "fraction:%" Vector__XXX
+
+BO_ 1314 MSG_0x522: 8 MaxxECU
+ SG_ FuelInjPulsewidth : 0|16@1+ (0.01,0) [0|655.35] "time:ms" Vector__XXX
+ SG_ FuelInjDuty : 16|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ FuelCut : 32|16@1+ (1,0) [0|100] "fraction:%" Vector__XXX
+ SG_ VehicleSpeed : 48|16@1+ (0.1,0) [0|6553.5] "speed:km/h" Vector__XXX
+
+BO_ 1315 MSG_0x523: 8 MaxxECU
+ SG_ WheelSpeedAvgNonDriven : 0|16@1+ (0.1,0) [0|6553.5] "speed:km/h" Vector__XXX
+ SG_ WheelSpeedAvgDriven : 16|16@1+ (0.1,0) [0|6553.5] "speed:km/h" Vector__XXX
+ SG_ TracControl_SlipMeasured : 32|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ TracControl_SlipTarget : 48|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+
+BO_ 1316 MSG_0x524: 8 MaxxECU
+ SG_ TracControl_CutRequest : 0|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ Lambda_corr_A : 16|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ Lambda_corr_B : 32|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ ECU_FirmwareVersion : 48|16@1+ (0.01,0) [0|655.35] "" Vector__XXX
+
+BO_ 1328 MSG_0x530: 8 MaxxECU
+ SG_ ECU_BatteryVoltage : 0|16@1+ (0.01,0) [0|655.35] "voltage:V" Vector__XXX
+ SG_ BaroPress : 16|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ IntakeAirTemp : 32|16@1+ (0.1,0) [0|6553.5] "temperature:C" Vector__XXX
+ SG_ CoolantTemp : 48|16@1+ (0.1,0) [0|6553.5] "temperature:C" Vector__XXX
+
+BO_ 1329 MSG_0x531: 8 MaxxECU
+ SG_ FuelTrimTotal : 0|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ FuelEthanolContent : 16|16@1+ (0.1,0) [0|6553.5] "fraction:%" Vector__XXX
+ SG_ Ignition_Trim_total : 32|16@1+ (0.1,0) [0|6553.5] "angle:deg" Vector__XXX
+ SG_ ExhaustTemp1 : 48|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+
+BO_ 1330 MSG_0x532: 8 MaxxECU
+ SG_ ExhaustTemp2 : 0|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ExhaustTemp3 : 16|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ExhaustTemp4 : 32|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ExhaustTemp5 : 48|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+
+BO_ 1331 MSG_0x533: 8 MaxxECU
+ SG_ ExhaustTemp6 : 0|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ExhaustTemp7 : 16|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ExhaustTemp8 : 32|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ExhaustTempHighest : 48|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+
+BO_ 1332 MSG_0x534: 8 MaxxECU
+ SG_ ExhaustTempDifference : 0|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ECU_Temp : 16|16@1+ (1,0) [0|65535] "temperature:C" Vector__XXX
+ SG_ ECU_ErrorCodeCount : 32|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ ECU_LostSyncCount : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+
+BO_ 1333 MSG_0x535: 8 MaxxECU
+ SG_ ECU_UserAnalogInput1 : 0|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ ECU_UserAnalogInput2 : 16|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ ECU_UserAnalogInput3 : 32|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+ SG_ ECU_UserAnalogInput4 : 48|16@1+ (0.1,0) [0|6553.5] "" Vector__XXX
+
+BO_ 1334 MSG_0x536: 8 MaxxECU
+ SG_ Engine_Oil_Pressure : 32|16@1+ (0.1,0) [0|6553.5] "pressure:kPa" Vector__XXX
+ SG_ Engine_Oil_Temperature : 48|16@1- (0.1,0) [-3276.8|3276.7] "temperature:C" Vector__XXX
+ SG_ GearPosn : 0|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ Boost_Solenoid_Duty : 16|16@1+ (0.1,0) [0|100] "fraction:%" Vector__XXX
+
+
+
+CM_ BU_ MaxxECU "CAN protocol version 1.3, derived from AEM dbc file";
+CM_ BO_ 1346 "v1.3";
+CM_ SG_ 1346 Spare_0x542_6 "Reserved for future usage";
+CM_ SG_ 1346 Spare_0x542_4 "Reserved for future usage";
+CM_ BO_ 1337 "v1.3";
+CM_ SG_ 1337 User_Channel_8 "User selectable source sensor in MTune.";
+CM_ SG_ 1337 User_Channel_7 "User selectable source sensor in MTune.";
+CM_ SG_ 1337 User_Channel_6 "User selectable source sensor in MTune.";
+CM_ SG_ 1337 User_Channel_5 "User selectable source sensor in MTune.";
+CM_ BO_ 1344 "v1.3";
+CM_ BO_ 1345 "v1.3";
+CM_ BO_ 1336 "v1.3";
+CM_ SG_ 1336 User_Channel_4 "User selectable source sensor in MTune.";
+CM_ SG_ 1336 User_Channel_3 "User selectable source sensor in MTune.";
+CM_ SG_ 1336 User_Channel_2 "User selectable source sensor in MTune.";
+CM_ SG_ 1336 User_Channel_1 "User selectable source sensor in MTune.";
+CM_ BO_ 1320 "v1.3";
+CM_ BO_ 1319 "v1.3";
+CM_ BO_ 1318 "v1.3";
+CM_ SG_ 1318 Spare_0x526_6 "Reserved for future usage";
+CM_ SG_ 1318 Spare_0x526_2 "Reserved for future usage";
+CM_ SG_ 1318 Spare_status_bit "Status bit, reserved for future usage";
+CM_ SG_ 1318 Nitrous_active "Status bit";
+CM_ SG_ 1318 ECU_is_logging "Status bit";
+CM_ SG_ 1318 User_cut_active "Status bit";
+CM_ SG_ 1318 GP_limiter_active "Status bit";
+CM_ SG_ 1318 Speed_limit_active "Status bit";
+CM_ SG_ 1318 Clutch_pedal_active "Status bit";
+CM_ SG_ 1318 Brake_pedal_active "Status bit";
+CM_ SG_ 1318 Knock_detected "Status bit. Visible for 250msec after a detected knock.";
+CM_ SG_ 1318 AC_idle_up_active "Status bit";
+CM_ SG_ 1318 Throttle_blip_active "Status bit";
+CM_ SG_ 1318 TracControl_power_limiter_active "Status bit";
+CM_ SG_ 1318 Launch_control_active "Status bit";
+CM_ SG_ 1318 Antilag_active "Status bit";
+CM_ SG_ 1318 Revlimit_active "Status bit";
+CM_ SG_ 1318 Shiftcut_active "Status bit";
+CM_ BO_ 1317 "v1.3";
+CM_ SG_ 1317 User_Channel_12 "User selectable source sensor in MTune.";
+CM_ SG_ 1317 User_Channel_11 "User selectable source sensor in MTune.";
+CM_ SG_ 1317 User_Channel_10 "User selectable source sensor in MTune.";
+CM_ SG_ 1317 User_Channel_9 "User selectable source sensor in MTune.";
+CM_ BO_ 1335 "v1.3";
+CM_ SG_ 1312 MAP "Intake manifold pressure";
+CM_ SG_ 1312 Lambda_Average "Average lambda";
+CM_ SG_ 1313 Lambda_A "Lambda cylinder bank A";
+CM_ SG_ 1313 Lambda_B "Lambda cylinder bank B";
+CM_ SG_ 1313 IgnitionCut "Percent of ignition event being cut (for rev-limit etc)";
+CM_ SG_ 1314 FuelInjDuty "Can be over 100%.";
+CM_ SG_ 1314 FuelCut "Percent of fuel event being cut (for rev-limit etc)";
+CM_ SG_ 1314 VehicleSpeed "Speed signal for display purpose";
+CM_ SG_ 1315 WheelSpeedAvgNonDriven "Zero when traction ctrl. system not used.";
+CM_ SG_ 1315 WheelSpeedAvgDriven "Zero when traction ctrl. system not used.";
+CM_ SG_ 1315 TracControl_SlipMeasured "Zero when traction ctrl. system not used.";
+CM_ SG_ 1315 TracControl_SlipTarget "Zero when traction ctrl. system not used.";
+CM_ SG_ 1316 TracControl_CutRequest "Zero when traction ctrl. system not used.";
+CM_ SG_ 1316 Lambda_corr_A "Short term lambda-correction applied to bank A cylinders";
+CM_ SG_ 1316 Lambda_corr_B "Short term lambda-correction applied to bank B cylinders";
+CM_ SG_ 1316 ECU_FirmwareVersion "Current ECU firmware version.";
+CM_ SG_ 1329 FuelTrimTotal "Total amount of adjustment applied to the fuel pulse, excluding acceleration enrichment.";
+CM_ SG_ 1329 FuelEthanolContent "Outputs zero when no sensor is used";
+CM_ SG_ 1329 Ignition_Trim_total "Total amount of adjustment applied to the ignition angle.";
+CM_ SG_ 1329 ExhaustTemp1 "Exhaust gas temperature. All values are sent, even for unconfigured sensors.";
+CM_ SG_ 1332 ExhaustTempDifference "Difference between the highest and lowest EGT sensor";
+CM_ SG_ 1332 ECU_Temp "ECU temperature";
+CM_ SG_ 1332 ECU_ErrorCodeCount "The number of active error codes (not stored)";
+CM_ SG_ 1332 ECU_LostSyncCount "Number of times the ECU has detected errors in the engine position sensors";
+CM_ SG_ 1333 ECU_UserAnalogInput1 "Available in firmware 1.79";
+CM_ SG_ 1333 ECU_UserAnalogInput2 "Available in firmware 1.79";
+CM_ SG_ 1333 ECU_UserAnalogInput3 "Available in firmware 1.79";
+CM_ SG_ 1333 ECU_UserAnalogInput4 "Available in firmware 1.79";
+CM_ SG_ 1334 Engine_Oil_Pressure "v1.2 protocol did not transmit anything here";
+CM_ SG_ 1334 Engine_Oil_Temperature "v1.2 protocol did not transmit anything here";
+CM_ SG_ 1334 GearPosn "Available in firmware 1.79. Gear Position";
+CM_ SG_ 1334 Boost_Solenoid_Duty "Available in firmware 1.79";
+BA_DEF_ BO_  "DBC_Author" STRING ;
+BA_DEF_ BO_  "DBC_Author_Contact" STRING ;
+BA_DEF_DEF_  "DBC_Author" "TT-Speed Oy";
+BA_DEF_DEF_  "DBC_Author_Contact" "www.ttspeed.fi";
+
