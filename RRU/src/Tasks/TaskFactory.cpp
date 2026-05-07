@@ -1,25 +1,41 @@
 #include "TaskFactory.h"
 #include "LoRa.h"
 #include "Outputs.h"
+#include "LoRaOutputs.h"
 #include <Arduino.h>
 
-static QueueHandle_t dataQueueHandle;
+static QueueHandle_t dataQueueHandle = nullptr;
 
-static TaskHandle_t loraTaskHandle = NULL;
-static TaskHandle_t outputsTaskHandle = NULL;
+static TaskHandle_t loraTaskHandle = nullptr;
+static TaskHandle_t outputsTaskHandle = nullptr;
 
 static LoRaTaskParameters loraParams;
 static OutputsTaskParameters outputsParams;
 
-void createTasks() {
-    // 1. Object
-    dataQueueHandle = xQueueCreate(10, sizeof(int)); // Update sizeof() later
+void createTasks()
+{
+    dataQueueHandle = xQueueCreate(10, sizeof(LoRaOutputEvent));
 
-    // 2. Params
-    loraParams.dataQueue = &dataQueueHandle;
-    outputsParams.dataQueue = &dataQueueHandle;
+    configASSERT(dataQueueHandle != nullptr);
 
-    // 3. Tasks
-    xTaskCreate(LoRaTask, "LoRaTask", 4096, (void*)&loraParams, 1, &loraTaskHandle);
-    // xTaskCreate(OutputsTask, "OutputsTask", 4096, (void*)&outputsParams, 1, &outputsTaskHandle);
+    loraParams.dataQueue = dataQueueHandle;
+    outputsParams.dataQueue = dataQueueHandle;
+
+    xTaskCreate(
+        LoRaTask,
+        "LoRaTask",
+        4096,
+        static_cast<void*>(&loraParams),
+        1,
+        &loraTaskHandle
+    );
+
+    xTaskCreate(
+        OutputsTask,
+        "OutputsTask",
+        4096,
+        static_cast<void*>(&outputsParams),
+        1,
+        &outputsTaskHandle
+    );
 }

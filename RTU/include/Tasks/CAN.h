@@ -7,7 +7,7 @@
 
 typedef struct 
 {
-    QueueHandle_t* dataQueue;
+    QueueHandle_t dataQueue;
 } CANTaskParameters;
 
 /// @brief CAN communication task, receives data from CAN bus and sends it to the data queue for processing

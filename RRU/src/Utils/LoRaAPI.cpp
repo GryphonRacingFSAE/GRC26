@@ -50,35 +50,35 @@ static constexpr uint32_t LORA_IRQ_MASK_ALL =
 
 static void LoRaApiPrintIrqFlags(uint32_t irq)
 {
-    Serial.print("  IRQ flags: 0x");
+    // Serial.print("  IRQ flags: 0x");
     Serial.println(irq, HEX);
 
     if (irq & RADIOLIB_LR11X0_IRQ_TX_DONE) {
-        Serial.println("    TX_DONE");
+        // Serial.println("    TX_DONE");
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_RX_DONE) {
-        Serial.println("    RX_DONE");
+        // Serial.println("    RX_DONE");
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_PREAMBLE_DETECTED) {
-        Serial.println("    PREAMBLE_DETECTED");
+        // Serial.println("    PREAMBLE_DETECTED");
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_SYNC_WORD_HEADER_VALID) {
-        Serial.println("    SYNC_WORD_HEADER_VALID");
+        // Serial.println("    SYNC_WORD_HEADER_VALID");
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_HEADER_ERR) {
-        Serial.println("    HEADER_ERR");
+        // Serial.println("    HEADER_ERR");
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_CRC_ERR) {
-        Serial.println("    CRC_ERR");
+        // Serial.println("    CRC_ERR");
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
-        Serial.println("    TIMEOUT");
+        // Serial.println("    TIMEOUT");
     }
 }
 
@@ -128,8 +128,8 @@ int16_t LoRaApiInit(bool txRole)
         LORA_TCXO_VOLTAGE
     );
 
-    Serial.print("[LR1121] begin state = ");
-    Serial.println(state);
+    // Serial.print("[LR1121] begin state = ");
+    // Serial.println(state);
 
     if (state != RADIOLIB_ERR_NONE) {
         return state;
@@ -143,21 +143,6 @@ int16_t LoRaApiInit(bool txRole)
     state = radio.clearIrqFlags(LORA_IRQ_MASK_ALL);
     if (state != RADIOLIB_ERR_NONE) {
         return state;
-    }
-
-    Serial.println("[LR1121] Init OK");
-    Serial.println("  Frequency: 915 MHz");
-    Serial.println("  BW:        125 kHz");
-    Serial.println("  SF:        9");
-    Serial.println("  CR:        4/7");
-    Serial.println("  Power:     5 dBm");
-    Serial.println("  TCXO:      1.6 V");
-    Serial.println("  IRQ mode:  Non-blocking SPI polling");
-
-    if (txRole) {
-        Serial.println("  Role:      TX");
-    } else {
-        Serial.println("  Role:      RX");
     }
 
     return RADIOLIB_ERR_NONE;
@@ -231,7 +216,7 @@ int16_t LoRaApiPollTransmit()
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
-        Serial.println("[LoRaAPI][TX] radio IRQ timeout");
+        // Serial.println("[LoRaAPI][TX] radio IRQ timeout");
         LoRaApiPrintIrqFlags(irq);
 
         radio.finishTransmit();
@@ -241,7 +226,7 @@ int16_t LoRaApiPollTransmit()
     }
 
     if ((uint32_t)(micros() - txStartUs) > txTimeoutUs) {
-        Serial.println("[LoRaAPI][TX] software TX timeout");
+        // Serial.println("[LoRaAPI][TX] software TX timeout");
         LoRaApiPrintIrqFlags(irq);
 
         radio.finishTransmit();
@@ -313,15 +298,15 @@ int16_t LoRaApiPollReceive(String& received)
         }
 
         if (finishState != RADIOLIB_ERR_NONE) {
-            Serial.print("[LoRaAPI][RX] finishReceive failed: ");
-            Serial.println(finishState);
+            // Serial.print("[LoRaAPI][RX] finishReceive failed: ");
+            // Serial.println(finishState);
         }
 
         return state;
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_CRC_ERR) {
-        Serial.println("[LoRaAPI][RX] CRC error IRQ");
+        // Serial.println("[LoRaAPI][RX] CRC error IRQ");
         LoRaApiPrintIrqFlags(irq);
 
         radio.finishReceive();
@@ -331,7 +316,7 @@ int16_t LoRaApiPollReceive(String& received)
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_HEADER_ERR) {
-        Serial.println("[LoRaAPI][RX] header error IRQ");
+        // Serial.println("[LoRaAPI][RX] header error IRQ");
         LoRaApiPrintIrqFlags(irq);
 
         radio.finishReceive();
@@ -341,7 +326,7 @@ int16_t LoRaApiPollReceive(String& received)
     }
 
     if (irq & RADIOLIB_LR11X0_IRQ_TIMEOUT) {
-        Serial.println("[LoRaAPI][RX] radio RX timeout IRQ");
+        // Serial.println("[LoRaAPI][RX] radio RX timeout IRQ");
         LoRaApiPrintIrqFlags(irq);
 
         radio.finishReceive();

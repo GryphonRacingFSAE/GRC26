@@ -16,8 +16,8 @@ void createTasks() {
     dataQueueHandle = xQueueCreate(10, sizeof(int)); // Update sizeof() later
 
     // 2. Params
-    loraParams.dataQueue = &dataQueueHandle;
-    canParams.dataQueue = &dataQueueHandle;
+    loraParams.dataQueue = dataQueueHandle;
+    canParams.dataQueue = dataQueueHandle;
 
     // 3. Tasks
     xTaskCreate(LoRaTask, "LoRaTask", 4096, (void*)&loraParams, 1, &loraTaskHandle);

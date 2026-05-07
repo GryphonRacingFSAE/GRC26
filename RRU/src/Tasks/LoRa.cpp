@@ -3,8 +3,9 @@
 #include "LoRa.h"
 #include "AssertMsg.h"
 #include "LoRaAPI.h"
+#include "LoRaOutputs.h"
 
-#define LORA_TASK_PERIOD_MS      5
+#define LORA_TASK_PERIOD_MS      20
 #define LORA_TX_PERIOD_MS        1000
 #define LORA_RX_TIMEOUT_MS       5000
 
@@ -36,21 +37,21 @@ static void BuildTelemetryPayload(char* payload, size_t payloadSize)
     const char* stateStr = "RUN";
 
     snprintf(
-        payload,
-        payloadSize,
-        "TEL|seq=%lu|ms=%lu|rpm=%u|apps=%.1f|brake=%.1f|temp=%.1f|vbat=%.2f|state=%s",
-        static_cast<unsigned long>(txCount),
-        static_cast<unsigned long>(nowMs),
-        rpm,
-        apps,
-        brakePressure,
-        coolantTemp,
-        batteryVoltage,
-        stateStr
+    payload,
+    payloadSize,
+    "TEL,%lu,%lu,%u,%.1f,%.1f,%.1f,%.2f,%s",
+    static_cast<unsigned long>(txCount),
+    static_cast<unsigned long>(nowMs),
+    rpm,
+    apps,
+    brakePressure,
+    coolantTemp,
+    batteryVoltage,
+    stateStr
     );
 }
 
-static void LoRaTxTaskPoll()
+static void LoRaTxTaskPoll(QueueHandle_t outputQueue)
 {
     if (!txActive) {
         uint32_t nowMs = millis();
@@ -59,12 +60,9 @@ static void LoRaTxTaskPoll()
             return;
         }
 
-        char payload[192];
+        char payload[LORA_OUTPUT_MAX_PAYLOAD_LEN];
 
         BuildTelemetryPayload(payload, sizeof(payload));
-
-        Serial.print("[LoRaTask][TX] Starting TX: ");
-        Serial.println(payload);
 
         int16_t state = LoRaApiStartTransmit(payload);
 
@@ -72,11 +70,12 @@ static void LoRaTxTaskPoll()
             txActive = true;
             lastTxMs = nowMs;
             txCount++;
+
+            LoRaOutputsPublishTxStarted(outputQueue, payload);
         } else if (state == LORA_API_BUSY) {
-            // Radio is busy; try again next task tick.
+            return;
         } else {
-            Serial.print("[LoRaTask][TX] start failed: ");
-            Serial.println(state);
+            LoRaOutputsPublishTxError(outputQueue, state);
         }
 
         return;
@@ -91,27 +90,23 @@ static void LoRaTxTaskPoll()
     txActive = false;
 
     if (state == RADIOLIB_ERR_NONE) {
-        Serial.println("[LoRaTask][TX] TX done");
+        LoRaOutputsPublishTxDone(outputQueue);
     } else {
-        Serial.print("[LoRaTask][TX] TX failed: ");
-        Serial.println(state);
+        LoRaOutputsPublishTxError(outputQueue, state);
     }
 }
 
-static void LoRaRxTaskPoll()
+static void LoRaRxTaskPoll(QueueHandle_t outputQueue)
 {
     if (!rxActive) {
-        Serial.println("[LoRaTask][RX] Starting RX window...");
-
         int16_t state = LoRaApiStartReceive(LORA_RX_TIMEOUT_MS);
 
         if (state == RADIOLIB_ERR_NONE) {
             rxActive = true;
         } else if (state == LORA_API_BUSY) {
-            // Radio is busy; try again next task tick.
+            return;
         } else {
-            Serial.print("[LoRaTask][RX] start failed: ");
-            Serial.println(state);
+            LoRaOutputsPublishRxError(outputQueue, state);
         }
 
         return;
@@ -127,43 +122,31 @@ static void LoRaRxTaskPoll()
     rxActive = false;
 
     if (state == RADIOLIB_ERR_NONE) {
-        Serial.println("=============================");
-        Serial.println("[LoRaTask][RX] PACKET RECEIVED");
-
-        Serial.print("  Raw:  ");
-        Serial.println(received);
-
-        Serial.print("  RSSI: ");
-        Serial.print(LoRaApiGetRSSI());
-        Serial.println(" dBm");
-
-        Serial.print("  SNR:  ");
-        Serial.print(LoRaApiGetSNR());
-        Serial.println(" dB");
-
-        if (received.startsWith("TEL|")) {
-            Serial.println("  Type: Telemetry packet");
-        } else {
-            Serial.println("  Type: Unknown packet");
-        }
-
-        Serial.println("=============================");
+        LoRaOutputsPublishRxPacket(
+            outputQueue,
+            received.c_str(),
+            LoRaApiGetRSSI(),
+            LoRaApiGetSNR()
+        );
     } else if (state == RADIOLIB_ERR_RX_TIMEOUT) {
-        Serial.println("[LoRaTask][RX] RX timeout — no packet received");
+        LoRaOutputsPublishRxTimeout(outputQueue, state);
     } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
-        Serial.println("[LoRaTask][RX] CRC mismatch — packet detected but corrupted");
+        LoRaOutputsPublishRxCrcMismatch(outputQueue, state);
     } else {
-        Serial.print("[LoRaTask][RX] RX failed: ");
-        Serial.println(state);
+        LoRaOutputsPublishRxError(outputQueue, state);
     }
 }
 
 void LoRaTask(void* pvParameters)
 {
     LoRaTaskParameters* params = reinterpret_cast<LoRaTaskParameters*>(pvParameters);
-    (void)params;
 
-    Serial.println("[LoRaTask] Starting LoRa task...");
+    configASSERT(params != nullptr);
+    configASSERT(params->dataQueue != nullptr);
+
+    QueueHandle_t outputQueue = params->dataQueue;
+
+    // Serial.println("[LoRaTask] Starting LoRa task...");
 
     int16_t state = LoRaApiInit(LORA_ROLE_TX);
 
@@ -174,9 +157,9 @@ void LoRaTask(void* pvParameters)
 
     for (;;) {
         if (LORA_ROLE_TX) {
-            LoRaTxTaskPoll();
+            LoRaTxTaskPoll(outputQueue);
         } else {
-            LoRaRxTaskPoll();
+            LoRaRxTaskPoll(outputQueue);
         }
 
         vTaskDelay(pdMS_TO_TICKS(LORA_TASK_PERIOD_MS));

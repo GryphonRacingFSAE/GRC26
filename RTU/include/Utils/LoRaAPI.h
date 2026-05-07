@@ -5,6 +5,19 @@
 
 static constexpr int16_t LORA_API_BUSY = 1;
 
+int16_t LoRaApiInit(bool txRole);
+
+bool LoRaApiIsBusy();
+
+int16_t LoRaApiStartTransmit(const char* payload);
+int16_t LoRaApiPollTransmit();
+
+int16_t LoRaApiStartReceive(uint32_t timeoutMs);
+int16_t LoRaApiPollReceive(String& received);
+
+float LoRaApiGetRSSI();
+float LoRaApiGetSNR();
+
 /// @brief Initialize the LoRa API
 /// @param txRole Boolean indicating whether this device is a transmitter (true) or receiver (false)
 /// @return Error code

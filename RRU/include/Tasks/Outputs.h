@@ -7,7 +7,7 @@
 
 typedef struct 
 {
-    QueueHandle_t* dataQueue;
+    QueueHandle_t dataQueue;
 } OutputsTaskParameters;
 
 /// @brief Outputs task, processes data from the data queue and prints to serial

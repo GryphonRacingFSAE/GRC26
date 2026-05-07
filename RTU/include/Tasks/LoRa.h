@@ -7,7 +7,7 @@
 
 typedef struct 
 {
-    QueueHandle_t* dataQueue;
+    QueueHandle_t dataQueue;
 } LoRaTaskParameters;
 
 /// @brief LoRa Task, handles all communication with the LoRa module
