@@ -4,97 +4,134 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
-static constexpr int8_t NUM_LEDS            = 11;  // 11 LEDs, idx 0–10
+static constexpr uint8_t NUM_LEDS = 11;   // Physical LEDs: idx 0–10
+
 #define PERIPH_TASK_PERIOD_MS 10
-#define LED_TYPE                              WS2812B
-#define COLOR_ORDER                           GRB
-#define VOLTS                                 5
-#define MAX_AMPS                              500
+#define LED_TYPE              WS2812B
+#define COLOR_ORDER           GRB
+#define VOLTS                 5
+#define MAX_AMPS              500
 
-static constexpr int8_t GREEN_STARTING_IDX  = 0;   // idx 0        (1 LED)
-static constexpr int8_t YELLOW_STARTING_IDX = 1;   // idx 1–3      (3 LEDs)
-static constexpr int8_t RED_STARTING_IDX    = 4;   // idx 4–6      (3 LEDs)
-static constexpr int8_t BLUE_STARTING_IDX   = 7;   // idx 7–10     (4 LEDs)
+// Physical LED layout
+static constexpr uint8_t RESERVED_FIRST_LED_IDX = 0;
+static constexpr uint8_t RPM_FIRST_LED_IDX      = 1;
+static constexpr uint8_t RPM_LAST_LED_IDX       = 9;
+static constexpr uint8_t RESERVED_LAST_LED_IDX  = 10;
 
-static constexpr uint16_t RPM_MIN           = 0;
-static constexpr uint16_t RPM_MAX           = 11000;
-static constexpr uint16_t RPM_SHIFT         = 9000;
+static constexpr uint8_t RPM_LED_COUNT =
+    RPM_LAST_LED_IDX - RPM_FIRST_LED_IDX + 1;  // 9 LEDs
+
+static constexpr uint16_t RPM_MIN             = 0;
+static constexpr uint16_t RPM_REDLINE         = 11000;
+static constexpr uint16_t RPM_FLASH_THRESHOLD = 10500;
+
+static constexpr uint32_t FLASH_INTERVAL_MS = 80;
 
 CRGB leds[NUM_LEDS];
 
-// ── Returns colour matching your zone layout ─────────────────────
-static CRGB colourForIndex(uint8_t idx)
+static CRGB colourForRPMIndex(uint8_t ledIdx)
 {
-    if (idx < YELLOW_STARTING_IDX) return CRGB::Green;
-    if (idx < RED_STARTING_IDX)    return CRGB::Yellow;
-    if (idx < BLUE_STARTING_IDX)   return CRGB::Red;
-    return CRGB::Blue;
+    const uint8_t rpmIdx = ledIdx - RPM_FIRST_LED_IDX; 
+
+    if (rpmIdx < 3) return CRGB::Yellow;   
+    if (rpmIdx < 6) return CRGB::Red;  
+    return CRGB::Blue;                     
 }
 
-// ── Maps RPM to how many LEDs should be lit ──────────────────────
 static uint8_t rpmToLEDCount(uint16_t rpm)
 {
-    if (rpm <= RPM_MIN) return 0;
-    if (rpm >= RPM_MAX) return NUM_LEDS;
-    return (uint8_t)map(rpm, RPM_MIN, RPM_MAX, 0, NUM_LEDS);
+    if (rpm <= RPM_MIN) {
+        return 0;
+    }
+
+    if (rpm >= RPM_REDLINE) {
+        return RPM_LED_COUNT;
+    }
+
+    return static_cast<uint8_t>(
+        (static_cast<uint32_t>(rpm) * RPM_LED_COUNT) / RPM_REDLINE
+    );
 }
 
-// ── Writes the RPM bar — no show() call ─────────────────────────
 static void writeRPMBar(uint8_t litCount)
 {
-    for (uint8_t i = 0; i < NUM_LEDS; i++)
+    for (uint8_t ledIdx = RPM_FIRST_LED_IDX; ledIdx <= RPM_LAST_LED_IDX; ledIdx++)
     {
-        leds[i] = (i < litCount) ? colourForIndex(i) : CRGB::Black;
+        const uint8_t rpmIdx = ledIdx - RPM_FIRST_LED_IDX;
+
+        if (rpmIdx < litCount) {
+            leds[ledIdx] = colourForRPMIndex(ledIdx);
+        } else {
+            leds[ledIdx] = CRGB::Black;
+        }
     }
 }
 
-// ── Task ─────────────────────────────────────────────────────────
+static void writeRPMFlash(bool flashState)
+{
+    for (uint8_t ledIdx = RPM_FIRST_LED_IDX; ledIdx <= RPM_LAST_LED_IDX; ledIdx++)
+    {
+        leds[ledIdx] = flashState ? CRGB::Blue : CRGB::Black;
+    }
+}
+
 void PeripheralTask(void *pvParameters)
 {
     Serial.println("[Periph] Task Started");
-    PeripheralTaskParameters* params = (PeripheralTaskParameters*)pvParameters;
-    QueueHandle_t data_queue = *(params->peripheralQueue); 
 
-    FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+    PeripheralTaskParameters* params = static_cast<PeripheralTaskParameters*>(pvParameters);
+    QueueHandle_t data_queue = *(params->peripheralQueue);
+
+    FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS)
+        .setCorrection(TypicalLEDStrip);
+
     FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS, MAX_AMPS);
     FastLED.setBrightness(50);
+
     FastLED.clear(true);
 
     EcuData_t ecuData = {0};
     uint16_t rpm_curr = 0;
-    bool     flashState = false;
-    uint32_t lastFlash = 0;
+
+    bool flashState = false;
+    uint32_t lastFlashTime = 0;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(PERIPH_TASK_PERIOD_MS);
 
     for (;;)
     {
-        EcuData_t incoming; 
-        while(xQueueReceive(data_queue, &incoming, 0) == pdPASS) {
+        EcuData_t incoming;
+
+        while (xQueueReceive(data_queue, &incoming, 0) == pdPASS)
+        {
             ecuData = incoming;
             rpm_curr = ecuData.rpm;
         }
 
-        uint32_t now = millis();
+        const uint32_t now = millis();
 
-        // Shift flash: strobe blue (matches your top zone) above RPM_SHIFT
-        if (rpm_curr >= RPM_SHIFT)
+        if (rpm_curr >= RPM_FLASH_THRESHOLD)
         {
-            if (now - lastFlash >= 80)
+            if (now - lastFlashTime >= FLASH_INTERVAL_MS)
             {
-                lastFlash  = now;
+                lastFlashTime = now;
                 flashState = !flashState;
-                fill_solid(leds, NUM_LEDS, flashState ? CRGB::Blue : CRGB::Black);
+
+                writeRPMFlash(flashState);
                 FastLED.show();
             }
         }
         else
         {
-            writeRPMBar(rpmToLEDCount(rpm_curr));
+            flashState = false;
+
+            const uint8_t litCount = rpmToLEDCount(rpm_curr);
+
+            writeRPMBar(litCount);
             FastLED.show();
         }
 
-        vTaskDelay(xFrequency);
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
