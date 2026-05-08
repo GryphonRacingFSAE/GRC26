@@ -63,9 +63,10 @@ static esp_err_t transmitFrame(uint32_t can_id, float offset_0, float offset_1, 
     };
 
     esp_err_t err = twai_transmit(&msg, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS));
-    if (err != ESP_OK) {
-        Serial.printf("[CAN] ERROR: Failed to transmit TWAI message (err=%d)\n", err);
+    if(err != ESP_OK) {
+        Serial.println("[CAN] Failed to transmit TWAI message");
     }
+    
     return err;
 }
 
@@ -75,15 +76,13 @@ static void initCAN() {
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
     esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config);
-    if (err != ESP_OK) {
-        Serial.printf("[CAN] ERROR: Failed to install TWAI driver (err=%d)\n", err);
-        return;
+    if(err != ESP_OK) {
+        Serial.println("[CAN] Failed to install TWAI driver");
     }
 
     err = twai_start();
-    if (err != ESP_OK) {
-        Serial.printf("[CAN] ERROR: Failed to start TWAI driver (err=%d)\n", err);
-        return;
+    if(err != ESP_OK) {
+        Serial.println("[CAN] Failed to start TWAI driver");
     }
 
     Serial.println("[CAN] TWAI driver installed and started");
