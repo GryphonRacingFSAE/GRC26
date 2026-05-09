@@ -79,18 +79,18 @@
 #include <stdint.h>
 
 // LCD pins
-static constexpr int8_t LCD_DE    =  5;
-static constexpr int8_t LCD_VSYNC =  3;
+static constexpr int8_t LCD_DE    =   5;
+static constexpr int8_t LCD_VSYNC =   3;
 static constexpr int8_t LCD_HSYNC =  46;
-static constexpr int8_t LCD_PCLK  =  7;
+static constexpr int8_t LCD_PCLK  =   7;
 // RGB Data pins
-static constexpr int8_t LCD_R3    =  1;
-static constexpr int8_t LCD_R4    =  2;
+static constexpr int8_t LCD_R3    =   1;
+static constexpr int8_t LCD_R4    =   2;
 static constexpr int8_t LCD_R5    =  42;
 static constexpr int8_t LCD_R6    =  41;
 static constexpr int8_t LCD_R7    =  40;
 static constexpr int8_t LCD_G2    =  39;
-static constexpr int8_t LCD_G3    =  0;
+static constexpr int8_t LCD_G3    =   0;
 static constexpr int8_t LCD_G4    =  45;
 static constexpr int8_t LCD_G5    =  48;
 static constexpr int8_t LCD_G6    =  47;
@@ -103,8 +103,11 @@ static constexpr int8_t LCD_B7    =  10;
 // CAN bus pins
 static constexpr int8_t LCD_CAN_TX = 15;
 static constexpr int8_t LCD_CAN_RX = 16; 
-// LED PINS
-// SDA pin on board
-static constexpr int8_t LED_DATA_PIN = 8;
+
+// PERIPHERAL pins
+static constexpr int8_t LED_DATA_PIN       =  8; // SDA pin on board
+static constexpr int8_t NEUTRAL_DETECT_PIN =  9; // SCL on board
+static constexpr int8_t OIL_PRESSURE_PIN   = 11; // RS485B on board
+
 
 #endif // PIN_DEFS_H
