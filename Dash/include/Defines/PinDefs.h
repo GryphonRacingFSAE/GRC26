@@ -78,6 +78,7 @@
 
 #include <stdint.h>
 
+// Refer pins to: https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-5/ESP32-S3-Touch-LCD-5-Sch.pdf
 // LCD pins
 static constexpr int8_t LCD_DE    =   5;
 static constexpr int8_t LCD_VSYNC =   3;
@@ -102,7 +103,7 @@ static constexpr int8_t LCD_B6    =  17;
 static constexpr int8_t LCD_B7    =  10;
 // CAN bus pins
 static constexpr int8_t LCD_CAN_TX = 15;
-static constexpr int8_t LCD_CAN_RX = 16; 
+static constexpr int8_t LCD_CAN_RX = 16;  
 
 // PERIPHERAL pins
 static constexpr int8_t LED_DATA_PIN       =  8; // SDA pin on board
