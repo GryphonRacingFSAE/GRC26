@@ -108,7 +108,7 @@ static constexpr int8_t LCD_CAN_RX = 16;
 // PERIPHERAL pins
 static constexpr int8_t LED_DATA_PIN       =  8; // SDA pin on board
 static constexpr int8_t NEUTRAL_DETECT_PIN =  9; // SCL on board
-static constexpr int8_t OIL_PRESSURE_PIN   = 11; // RS485B on board
+static constexpr int8_t OIL_PRESSURE_PIN   = 43; // RS485B on board
 
 
 #endif // PIN_DEFS_H
