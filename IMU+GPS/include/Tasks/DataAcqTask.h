@@ -32,14 +32,6 @@ typedef struct {
     bool gps_updated;
 } IMUGPSData_t;
 
-/* GPSData_t
- * @brief: Struct to hold the latest GPS data read from the TinyGPS++ library.
-*/
-typedef struct {
-
-    bool updated;
-} GPSData_t;
-
 /* void DataAcqTask(void* pvParameters)
  * @brief: FreeRTOS task function that continuously reads data from the ICM-20948 IMU and sends it to a queue for other tasks to consume.
  * @param: pvParameters - Pointer to a DataAcqTaskParameters struct containing the queue handle for sending IMU data.
