@@ -9,7 +9,6 @@ static bool LoRaOutputsPublishEvent(QueueHandle_t queue, const LoRaOutputEvent& 
         return false;
     }
 
-    // Do not overwrite old events. If the queue is full, this drops the newest event.
     return xQueueSend(queue, &event, 0) == pdTRUE;
 }
 

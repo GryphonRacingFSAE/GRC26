@@ -1,0 +1,4 @@
+event,rx_count,rx_ms,rssi_dbm,snr_db,radio_len,packet_type,seq,tx_ms,alert_flags_hex,status_bits_hex,rpm,tps_pct,map_kpa,lambda_avg,lambda_error,oil_pressure_kpa,fuel_pressure_kpa,coolant_temp_c,battery_v,vehicle_speed_kph,gear,oil_temp_c,intake_air_temp_c,fuel_inj_duty_pct,fuel_trim_total_pct,lambda_corr_a_pct,lambda_corr_b_pct,ignition_timing_deg,ignition_cut_pct,fuel_cut_pct,ecu_error_count,ecu_lost_sync_count,ecu_temp_c,egt_highest_c,egt_delta_c,knock_count,knock_correction_deg,boost_target_kpa,boost_duty_pct,coolant_pressure_kpa,wastegate_pressure_kpa
+rx_packet,1,1000,-42.5,9.25,35,FAST,12,980,,0x0000,5200,34.2,98.4,1.002,-0.018,250.0,360.0,88.5,13.25,41.2,3,,,,,,,,,,,,,,,,,,,,
+rx_packet,2,2000,-43.0,9.0,51,SLOW,13,1980,,,,,,,,,,,,,,102.3,36.1,72.5,1.8,0.5,0.7,18.2,0,0,0,0,51,760,45,0,0.0,120.0,64.0,101.0,0.0
+rx_packet,3,2500,-41.75,9.5,31,EVENT,14,2480,0x0010,0x0080,5400,,,,-0.12,85.0,355.0,89.0,13.2,,,,,,,,,,,,0,0,,,,1,,,,,

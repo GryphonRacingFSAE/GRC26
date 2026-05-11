@@ -4,14 +4,15 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include "Telemetry.h"
 
-typedef struct 
+struct LoRaTaskParameters
 {
+    // TX role: receives TelemetryPacket objects from CAN task.
+    // RX role: may be nullptr; receiver prints decoded packets to Serial.
     QueueHandle_t dataQueue;
-} LoRaTaskParameters;
+};
 
-/// @brief LoRa Task, handles all communication with the LoRa module
-/// @param pvParameters LoRaTaskParameters
 void LoRaTask(void* pvParameters);
 
 #endif // LORA_H

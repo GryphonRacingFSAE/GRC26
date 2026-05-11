@@ -1,17 +1,53 @@
-#ifndef CAN_H
-#define CAN_H
+#include <Arduino.h>
+#include <TaskFactory.h>
+#include "Telemetry.h"
+#include "CANTask.h"
+#include "LoRa.h"
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
+static QueueHandle_t dataQueueHandle = nullptr;
 
-typedef struct 
+static TaskHandle_t loraTaskHandle = nullptr;
+static TaskHandle_t canTaskHandle = nullptr;
+
+static LoRaTaskParameters loraParams = {};
+static CANTaskParameters canParams = {};
+
+void createTasks()
 {
-    QueueHandle_t dataQueue;
-} CANTaskParameters;
+    // One typed queue: CAN task produces TelemetryPacket, LoRa task consumes it.
+    dataQueueHandle = xQueueCreate(24, sizeof(TelemetryPacket));
 
-/// @brief CAN communication task, receives data from CAN bus and sends it to the data queue for processing
-/// @param pvParameters 
-void CANTask(void* pvParameters);
+    if (dataQueueHandle == nullptr) {
+        Serial.println("[TaskFactory] Failed to create telemetry queue");
+        return;
+    }
 
-#endif // CAN_H
+    loraParams.dataQueue = dataQueueHandle;
+    canParams.dataQueue = dataQueueHandle;
+
+    const BaseType_t loraCreated = xTaskCreate(
+        LoRaTask,
+        "LoRaTask",
+        4096,
+        &loraParams,
+        2,
+        &loraTaskHandle
+    );
+
+    const BaseType_t canCreated = xTaskCreate(
+        CANTask,
+        "CANTask",
+        4096,
+        &canParams,
+        3,
+        &canTaskHandle
+    );
+
+    if (loraCreated != pdPASS) {
+        Serial.println("[TaskFactory] Failed to create LoRa task");
+    }
+
+    if (canCreated != pdPASS) {
+        Serial.println("[TaskFactory] Failed to create CAN task");
+    }
+}

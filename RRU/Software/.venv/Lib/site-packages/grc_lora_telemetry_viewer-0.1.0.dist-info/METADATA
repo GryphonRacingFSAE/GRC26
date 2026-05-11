@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: grc-lora-telemetry-viewer
+Version: 0.1.0
+Summary: Foxglove + MCAP serial bridge for Gryphon Racing LoRa telemetry packets
+Requires-Python: >=3.10
+Requires-Dist: foxglove-websocket>=0.1.0
+Requires-Dist: mcap>=1.1.0
+Requires-Dist: pyserial>=3.5
+Requires-Dist: pyserial-asyncio>=0.6

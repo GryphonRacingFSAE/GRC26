@@ -1,0 +1,18 @@
+[project]
+name = "grc-lora-telemetry-viewer"
+version = "0.1.0"
+description = "Foxglove + MCAP serial bridge for Gryphon Racing LoRa telemetry packets"
+requires-python = ">=3.10"
+dependencies = [
+  "foxglove-websocket>=0.1.0",
+  "mcap>=1.1.0",
+  "pyserial>=3.5",
+  "pyserial-asyncio>=0.6",
+]
+
+[project.scripts]
+grc-lora-foxglove = "grc_lora_telemetry.foxglove_server:cli"
+grc-lora-csv = "grc_lora_telemetry.csv_logger:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]

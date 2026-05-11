@@ -1,0 +1,76 @@
+{
+  "name": "GRC LoRa Telemetry Starter",
+  "description": "Starter channel map for the new GRC LoRa telemetry bridge. If your Foxglove version cannot import this directly, use these paths to create plots manually.",
+  "websocket": "ws://localhost:8765",
+  "topics": {
+    "/telemetry/fast": [
+      "rpm",
+      "tps_pct",
+      "map_kpa",
+      "lambda_avg",
+      "lambda_error",
+      "oil_pressure_kpa",
+      "fuel_pressure_kpa",
+      "coolant_temp_c",
+      "battery_v",
+      "vehicle_speed_kph",
+      "gear",
+      "status_bits"
+    ],
+    "/telemetry/slow": [
+      "oil_temp_c",
+      "intake_air_temp_c",
+      "fuel_inj_duty_pct",
+      "fuel_trim_total_pct",
+      "lambda_corr_a_pct",
+      "lambda_corr_b_pct",
+      "ignition_timing_deg",
+      "ecu_error_count",
+      "ecu_lost_sync_count",
+      "ecu_temp_c",
+      "egt_highest_c",
+      "egt_delta_c",
+      "knock_count",
+      "knock_correction_deg",
+      "boost_target_kpa",
+      "boost_duty_pct",
+      "coolant_pressure_kpa",
+      "wastegate_pressure_kpa"
+    ],
+    "/telemetry/event": [
+      "alert_flags",
+      "status_bits",
+      "rpm",
+      "oil_pressure_kpa",
+      "fuel_pressure_kpa",
+      "coolant_temp_c",
+      "battery_v",
+      "lambda_error",
+      "ecu_error_count",
+      "ecu_lost_sync_count",
+      "knock_count"
+    ]
+  },
+  "recommended_panels": [
+    {
+      "title": "Engine / Driver",
+      "paths": ["/telemetry/fast.rpm", "/telemetry/fast.tps_pct", "/telemetry/fast.vehicle_speed_kph"]
+    },
+    {
+      "title": "Fueling",
+      "paths": ["/telemetry/fast.lambda_avg", "/telemetry/fast.lambda_error", "/telemetry/slow.lambda_corr_a_pct", "/telemetry/slow.lambda_corr_b_pct"]
+    },
+    {
+      "title": "Safety Pressures",
+      "paths": ["/telemetry/fast.oil_pressure_kpa", "/telemetry/fast.fuel_pressure_kpa", "/telemetry/slow.coolant_pressure_kpa"]
+    },
+    {
+      "title": "Thermals",
+      "paths": ["/telemetry/fast.coolant_temp_c", "/telemetry/slow.oil_temp_c", "/telemetry/slow.intake_air_temp_c", "/telemetry/slow.egt_highest_c"]
+    },
+    {
+      "title": "ECU Health",
+      "paths": ["/telemetry/slow.ecu_error_count", "/telemetry/slow.ecu_lost_sync_count", "/telemetry/event.alert_flags"]
+    }
+  ]
+}

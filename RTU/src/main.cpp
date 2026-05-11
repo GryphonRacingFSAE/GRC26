@@ -1,13 +1,14 @@
 #include <Arduino.h>
 #include <TaskFactory.h>
 
-void setup() 
+void setup()
 {
-  Serial.begin(115200);
-  createTasks();
+    Serial.begin(115200);
+    delay(300);
+    createTasks();
 }
 
-void loop() 
+void loop()
 {
-  vTaskDelete(NULL);
+    vTaskDelete(nullptr);
 }
