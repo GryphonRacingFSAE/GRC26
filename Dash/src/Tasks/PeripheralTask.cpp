@@ -9,6 +9,9 @@
 
 static constexpr uint8_t NUM_LEDS = 11;   // Physical LEDs: idx 0–10
 
+int8_t NEUTRAL_TRUE     = 1;
+int8_t OIL_PRESSURE_BAD = 1;
+
 #define LED_TYPE              WS2812B
 #define COLOR_ORDER           GRB
 #define VOLTS                 5
@@ -21,14 +24,23 @@ static constexpr uint8_t RPM_FIRST_LED_IDX    = 1;
 static constexpr uint8_t RPM_LAST_LED_IDX     = 9;
 static constexpr uint8_t LAST_UNUSED_LED_IDX  = 10;
 
-static constexpr uint8_t RPM_LED_COUNT =
-    RPM_LAST_LED_IDX - RPM_FIRST_LED_IDX + 1;  // 9 LEDs
+static constexpr uint8_t RPM_LED_COUNT = RPM_LAST_LED_IDX - RPM_FIRST_LED_IDX + 1;  // 9 LEDs
 
 static constexpr uint16_t RPM_MIN             = 0;
 static constexpr uint16_t RPM_REDLINE         = 11000;
 static constexpr uint16_t RPM_FLASH_THRESHOLD = 10500;
 
 CRGB leds[NUM_LEDS];
+
+void NeutralDetectISR()
+{
+    NEUTRAL_TRUE = digitalRead(NEUTRAL_DETECT_PIN) == LOW;
+}
+
+void OilPressureISR()
+{
+    OIL_PRESSURE_BAD = digitalRead(OIL_PRESSURE_PIN) == LOW;
+}
 
 static CRGB colourForRPMIndex(uint8_t ledIdx)
 {
@@ -76,11 +88,26 @@ static void writeRPMFlash(bool flashState)
     }
 }
 
-static void writeAllLEDs(uint16_t rpm, bool rpmFlashState)
+static void writeAllLEDs(uint16_t rpm, bool rpmFlashState, int8_t neutralState, int8_t oilPressureState)
 {
-    // Keep first and last LEDs disabled for now.
-    leds[FIRST_UNUSED_LED_IDX] = CRGB::Black;
-    leds[LAST_UNUSED_LED_IDX]  = CRGB::Black;
+    if(neutralState)
+    {
+        leds[FIRST_UNUSED_LED_IDX] = CRGB::Green;
+    }
+    else
+    {
+        leds[FIRST_UNUSED_LED_IDX] = CRGB::Black;
+
+    }
+    if(oilPressureState)
+    {
+        leds[LAST_UNUSED_LED_IDX] = CRGB::Red;
+    }
+    else
+    {
+        leds[LAST_UNUSED_LED_IDX] = CRGB::Black;
+
+    }
 
     if (rpm >= RPM_FLASH_THRESHOLD)
     {
@@ -91,10 +118,23 @@ static void writeAllLEDs(uint16_t rpm, bool rpmFlashState)
         writeRPMBar(rpmToLEDCount(rpm));
     }
 
-    // Force them off again in case anything accidentally touched them.
-    leds[FIRST_UNUSED_LED_IDX] = CRGB::Black;
-    leds[LAST_UNUSED_LED_IDX]  = CRGB::Black;
+    if(neutralState)
+    {
+        leds[FIRST_UNUSED_LED_IDX] = CRGB::Green;
+    }
+    else
+    {
+        leds[FIRST_UNUSED_LED_IDX] = CRGB::Black;
 
+    }
+    if(oilPressureState)
+    {
+        leds[LAST_UNUSED_LED_IDX] = CRGB::Red;
+    }
+    else
+    {
+        leds[LAST_UNUSED_LED_IDX]  = CRGB::Black;
+    }
     FastLED.show();
 }
 
@@ -102,13 +142,18 @@ void PeripheralTask(void *pvParameters)
 {
     Serial.println("[Periph] Task Started");
 
-    PeripheralTaskParameters* params =
-        static_cast<PeripheralTaskParameters*>(pvParameters);
+    // Interrupt registration
+    pinMode(NEUTRAL_DETECT_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(NEUTRAL_DETECT_PIN), NeutralDetectISR, CHANGE);
+
+    pinMode(OIL_PRESSURE_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(OIL_PRESSURE_PIN), OilPressureISR, CHANGE);
+
+    PeripheralTaskParameters* params = static_cast<PeripheralTaskParameters*>(pvParameters);
 
     QueueHandle_t data_queue = *(params->peripheralQueue);
 
-    FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS)
-        .setCorrection(TypicalLEDStrip);
+    FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 
     FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS, MAX_AMPS);
     FastLED.setBrightness(50);
@@ -120,13 +165,13 @@ void PeripheralTask(void *pvParameters)
 
     bool rpmFlashState = false;
 
-    writeAllLEDs(rpm_curr, rpmFlashState);
+    writeAllLEDs(rpm_curr, rpmFlashState, NEUTRAL_TRUE, OIL_PRESSURE_BAD);
 
     for (;;)
     {
         EcuData_t incoming;
 
-        // Block here until the queue receives new data.
+        //Block here until the queue receives new data.
         if (xQueueReceive(data_queue, &incoming, portMAX_DELAY) == pdPASS)
         {
             ecuData = incoming;
@@ -148,7 +193,7 @@ void PeripheralTask(void *pvParameters)
                 rpmFlashState = false;
             }
 
-            writeAllLEDs(rpm_curr, rpmFlashState);
+            writeAllLEDs(rpm_curr, rpmFlashState, NEUTRAL_TRUE, OIL_PRESSURE_BAD);
         }
     }
 }
