@@ -80,6 +80,11 @@ static void writeRPMBar(uint8_t litCount)
     }
 }
 
+static void oilPressureFlash(bool flashState)
+{
+    leds[LAST_UNUSED_LED_IDX] = flashState ? CRGB::Red : CRGB::Black;
+}
+
 static void writeRPMFlash(bool flashState)
 {
     for (uint8_t ledIdx = RPM_FIRST_LED_IDX; ledIdx <= RPM_LAST_LED_IDX; ledIdx++)
@@ -88,7 +93,7 @@ static void writeRPMFlash(bool flashState)
     }
 }
 
-static void writeAllLEDs(uint16_t rpm, bool rpmFlashState, int8_t neutralState, int8_t oilPressureState)
+static void writeAllLEDs(uint16_t rpm, bool rpmFlashState, bool oilFlashState, int8_t neutralState, int8_t oilPressureState)
 {
     if(neutralState)
     {
@@ -129,7 +134,7 @@ static void writeAllLEDs(uint16_t rpm, bool rpmFlashState, int8_t neutralState, 
     }
     if(oilPressureState)
     {
-        leds[LAST_UNUSED_LED_IDX] = CRGB::Red;
+        oilPressureFlash(oilFlashState);
     }
     else
     {
@@ -156,16 +161,17 @@ void PeripheralTask(void *pvParameters)
     FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 
     FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS, MAX_AMPS);
-    FastLED.setBrightness(50);
+    FastLED.setBrightness(100);
 
     FastLED.clear(true);
 
     EcuData_t ecuData = {0};
-    uint16_t rpm_curr = 0;
+    uint16_t rpm_curr = 100;
 
     bool rpmFlashState = false;
+    bool oilFlashState = false;
 
-    writeAllLEDs(rpm_curr, rpmFlashState, NEUTRAL_TRUE, OIL_PRESSURE_BAD);
+    writeAllLEDs(rpm_curr, rpmFlashState, oilFlashState, NEUTRAL_TRUE, OIL_PRESSURE_BAD);
 
     for (;;)
     {
@@ -193,7 +199,16 @@ void PeripheralTask(void *pvParameters)
                 rpmFlashState = false;
             }
 
-            writeAllLEDs(rpm_curr, rpmFlashState, NEUTRAL_TRUE, OIL_PRESSURE_BAD);
+            if(OIL_PRESSURE_BAD)
+            {
+                oilFlashState = !oilFlashState;
+            }
+            else
+            {
+                oilFlashState = false;
+            }
+
+            writeAllLEDs(rpm_curr, rpmFlashState, oilFlashState, NEUTRAL_TRUE, OIL_PRESSURE_BAD);
         }
     }
 }
