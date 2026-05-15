@@ -19,9 +19,11 @@ def run(args: argparse.Namespace) -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    active_header = CSV_HEADER.copy()
+
     with serial.Serial(args.serial_port, args.baud, timeout=1) as ser, output_path.open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(CSV_HEADER)
+        writer.writerow(active_header)
         f.flush()
 
         print(f"[serial] logging {args.serial_port} at {args.baud} to {output_path}")
@@ -36,7 +38,8 @@ def run(args: argparse.Namespace) -> None:
                 continue
 
             if line.startswith("event,"):
-                # The firmware's header should match ours. Do not duplicate it.
+                # The firmware's header is the source of truth once it appears.
+                active_header = next(csv.reader([line]))
                 continue
 
             if not line.startswith("rx_packet,"):
@@ -44,16 +47,27 @@ def run(args: argparse.Namespace) -> None:
                     print(f"[ignored] {line}", file=sys.stderr)
                 continue
 
-            row = next(csv.reader([line]))
+            try:
+                row = next(csv.reader([line]))
+            except csv.Error:
+                if args.verbose:
+                    print(f"[bad csv] {line}", file=sys.stderr)
+                continue
+
+            if len(row) < len(active_header):
+                row = row + [""] * (len(active_header) - len(row))
+            elif len(row) > len(active_header):
+                row = row[: len(active_header)]
+
             writer.writerow(row)
             f.flush()
             if args.print_rows:
-                print(line)
+                print(",".join(row))
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Record GRC LoRa RX serial CSV to a file.")
-    p.add_argument("serial_port", help="Serial port for RX board, for example COM7 or /dev/ttyUSB0")
+    p.add_argument("serial_port", help="Serial port for RX board")
     p.add_argument("output", help="Output CSV path")
     p.add_argument("--baud", type=int, default=115200)
     p.add_argument("--print-rows", action="store_true")

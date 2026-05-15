@@ -41,13 +41,21 @@ class TelemetryCsvParser:
         if not self._looks_like_csv(line):
             return None
 
-        row = next(csv.reader([line]))
+        try:
+            row = next(csv.reader([line]))
+        except csv.Error:
+            return None
+
         if not row:
             return None
 
         # Receiver prints a header once. Accept it and continue.
         if row[0] == "event":
             self.header = [field.strip() for field in row]
+            return None
+
+        # Ignore malformed packet rows.
+        if row[0] != "rx_packet":
             return None
 
         # Pad/truncate to match the header, so old/new firmware revisions do not
@@ -65,12 +73,19 @@ class TelemetryCsvParser:
             return None
 
         topic, fields = TOPICS[packet_type]
-        payload = {field: typed.get(field) for field in fields}
 
-        # Use RX timestamp from the board if present; otherwise fall back to zero.
-        # Foxglove and MCAP expect timestamps in nanoseconds.
-        rx_ms = typed.get("rx_ms")
-        timestamp_ns = int(rx_ms * 1_000_000) if isinstance(rx_ms, (int, float)) else 0
+        # Foxglove does not like null values when the schema says "number" or
+        # "string". Keep only fields that have real values.
+        payload = {
+            field: typed.get(field)
+            for field in fields
+            if typed.get(field) is not None
+        }
+
+        # Force foxglove_server.py to use current host wall-clock time.
+        # The original rx_ms value is still included in the payload, so you can
+        # plot/debug it if needed.
+        timestamp_ns = 0
 
         return ParsedTelemetry(
             packet_type=packet_type,
@@ -89,6 +104,7 @@ class TelemetryCsvParser:
 
         for key, value in row.items():
             value = value.strip()
+
             if value == "":
                 out[key] = None
                 continue
@@ -133,6 +149,7 @@ def _parse_float(value: str) -> float | None:
 def _parse_hex_or_none(value: str) -> int | None:
     if not value:
         return None
+
     try:
         return int(value, 16)
     except ValueError:
@@ -142,8 +159,10 @@ def _parse_hex_or_none(value: str) -> int | None:
 def parse_lines(lines: Iterable[str]) -> list[ParsedTelemetry]:
     parser = TelemetryCsvParser()
     packets: list[ParsedTelemetry] = []
+
     for line in lines:
         parsed = parser.parse_line(line)
         if parsed is not None:
             packets.append(parsed)
+
     return packets

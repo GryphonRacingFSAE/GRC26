@@ -34,21 +34,14 @@ struct EcuTelemetryState
     uint16_t map_kpa_x10;
     uint16_t lambda_avg_x1000;
 
+    // 0x522
+    uint16_t vehicle_speed_kph_x10;
+
+    // 0x526
+    uint16_t status_bits;
+
     // 0x527
     int16_t lambda_target_x1000;
-    int16_t lambda_error_x1000;
-
-    // 0x536
-    int16_t gear;
-    uint16_t boost_duty_x10;
-    uint16_t oil_pressure_kpa_x10;
-    int16_t oil_temp_c_x10;
-
-    // 0x537
-    uint16_t fuel_pressure_kpa_x10;
-    uint16_t wastegate_pressure_kpa_x10;
-    uint16_t coolant_pressure_kpa_x10;
-    uint16_t boost_target_kpa_x10;
 
     // 0x530
     uint16_t battery_v_x100;
@@ -56,48 +49,26 @@ struct EcuTelemetryState
     int16_t intake_air_temp_c_x10;
     int16_t coolant_temp_c_x10;
 
-    // 0x522
-    uint16_t fuel_inj_pw_ms_x100;
-    uint16_t fuel_inj_duty_x10;
-    uint16_t fuel_cut_percent;
-    uint16_t vehicle_speed_kph_x10;
-
-    // 0x521
-    uint16_t lambda_a_x1000;
-    uint16_t lambda_b_x1000;
-    uint16_t ignition_timing_deg_x10;
-    uint16_t ignition_cut_percent;
-
-    // 0x524
-    uint16_t tc_cut_request_x10;
-    uint16_t lambda_corr_a_x10;
-    uint16_t lambda_corr_b_x10;
-    uint16_t ecu_firmware_version_x100;
-
     // 0x534
     uint16_t egt_delta_c;
     uint16_t ecu_temp_c;
     uint16_t ecu_error_count;
     uint16_t ecu_lost_sync_count;
 
-    // 0x533
-    uint16_t egt_highest_c;
+    // 0x537
+    uint16_t fuel_pressure_kpa_x10;
+    uint16_t coolant_pressure_kpa_x10;
 
-    // 0x531
-    uint16_t fuel_trim_total_x10;
-    uint16_t ethanol_content_x10;
-    uint16_t ignition_trim_total_deg_x10;
+    // 0x538
+    uint16_t brake_pressure_kpa_x10;
 
-    // 0x528
-    uint16_t knock_level_peak;
-    uint16_t knock_correction_deg_x10;
-    uint16_t knock_count;
-    uint16_t knock_last_cylinder;
-
-    // 0x526
-    uint16_t status_bits;
+    // 0x600
+    int16_t acceleration_x_mg;
+    int16_t acceleration_y_mg;
+    int16_t acceleration_z_mg;
 
     uint32_t lastCanRxMs;
+    uint16_t lambda_error_x1000;
 };
 
 static EcuTelemetryState ecu = {};
@@ -112,27 +83,44 @@ static uint16_t lastKnockCount = 0;
 static uint32_t lastFastTxMs = 0;
 static uint32_t lastSlowTxMs = 0;
 
+/// @brief Converts a little-endian unsigned 16-bit value from a byte array at the specified index.
+/// @param data Pointer to the byte array containing the data.
+/// @param byteIndex The starting index of the 16-bit value in the byte array.
+/// @return The converted 16-bit value.
 static inline uint16_t u16_le(const uint8_t* data, uint8_t byteIndex)
 {
     return (uint16_t)data[byteIndex] | ((uint16_t)data[byteIndex + 1] << 8);
 }
 
+
+/// @brief Converts a little-endian signed 16-bit value from a byte array at the specified index.
+/// @param data Pointer to the byte array containing the data.
+/// @param byteIndex The starting index of the 16-bit value in the byte array.
+/// @return The converted 16-bit value.
 static inline int16_t i16_le(const uint8_t* data, uint8_t byteIndex)
 {
     return (int16_t)u16_le(data, byteIndex);
 }
 
+/// @brief Saturation function for signed 16-bit integers.
+/// @param value The input value to saturate.
+/// @return The saturated 16-bit value.
 static inline int16_t sat_i16(int32_t value)
 {
-    if (value > INT16_MAX) {
+    if (value > INT16_MAX) 
+    {
         return INT16_MAX;
     }
-    if (value < INT16_MIN) {
+    if (value < INT16_MIN) 
+    {
         return INT16_MIN;
     }
     return (int16_t)value;
 }
 
+/// @brief Absolute value function for signed 16-bit integers.
+/// @param value The input value.
+/// @return The absolute value as an unsigned 16-bit integer.
 static inline uint16_t abs_i16(int16_t value)
 {
     return (value < 0) ? (uint16_t)(-value) : (uint16_t)value;
@@ -172,7 +160,7 @@ static bool decodeCanData(const twai_message_t* msg)
         return false;
     }
 
-    // Ignore extended and remote frames for this DBC.
+    // Ignore extended and remote frames
     if (msg->extd || msg->rtr) {
         return false;
     }
@@ -182,7 +170,8 @@ static bool decodeCanData(const twai_message_t* msg)
 
     bool decoded = true;
 
-    switch (msg->identifier) {
+    switch (msg->identifier) 
+    {
         case 0x520: // RPM, TPS, MAP, Lambda Average
             if (len < 8) return false;
             ecu.rpm              = u16_le(d, 0);
@@ -190,30 +179,6 @@ static bool decodeCanData(const twai_message_t* msg)
             ecu.map_kpa_x10      = u16_le(d, 4);
             ecu.lambda_avg_x1000 = u16_le(d, 6);
             updateLambdaError();
-            break;
-
-        case 0x521: // Lambda A/B, Ignition Timing, Ignition Cut
-            if (len < 8) return false;
-            ecu.lambda_a_x1000          = u16_le(d, 0);
-            ecu.lambda_b_x1000          = u16_le(d, 2);
-            ecu.ignition_timing_deg_x10 = u16_le(d, 4);
-            ecu.ignition_cut_percent    = u16_le(d, 6);
-            break;
-
-        case 0x522: // Fuel Inj, Fuel Cut, Vehicle Speed
-            if (len < 8) return false;
-            ecu.fuel_inj_pw_ms_x100  = u16_le(d, 0);
-            ecu.fuel_inj_duty_x10    = u16_le(d, 2);
-            ecu.fuel_cut_percent     = u16_le(d, 4);
-            ecu.vehicle_speed_kph_x10 = u16_le(d, 6);
-            break;
-
-        case 0x524: // Lambda corrections, TC cut request
-            if (len < 8) return false;
-            ecu.tc_cut_request_x10        = u16_le(d, 0);
-            ecu.lambda_corr_a_x10         = u16_le(d, 2);
-            ecu.lambda_corr_b_x10         = u16_le(d, 4);
-            ecu.ecu_firmware_version_x100 = u16_le(d, 6);
             break;
 
         case 0x526: // Status bits
@@ -227,32 +192,12 @@ static bool decodeCanData(const twai_message_t* msg)
             updateLambdaError();
             break;
 
-        case 0x528: // Knock data
-            if (len < 8) return false;
-            ecu.knock_level_peak         = u16_le(d, 0);
-            ecu.knock_correction_deg_x10 = u16_le(d, 2);
-            ecu.knock_count              = u16_le(d, 4);
-            ecu.knock_last_cylinder      = u16_le(d, 6);
-            break;
-
         case 0x530: // Battery, IAT, Coolant Temp
             if (len < 8) return false;
             ecu.battery_v_x100        = u16_le(d, 0);
             ecu.baro_kpa_x10          = u16_le(d, 2);
             ecu.intake_air_temp_c_x10 = (int16_t)u16_le(d, 4);
             ecu.coolant_temp_c_x10    = (int16_t)u16_le(d, 6);
-            break;
-
-        case 0x531: // Fuel trim, ethanol, ignition trim
-            if (len < 6) return false;
-            ecu.fuel_trim_total_x10         = u16_le(d, 0);
-            ecu.ethanol_content_x10         = u16_le(d, 2);
-            ecu.ignition_trim_total_deg_x10 = u16_le(d, 4);
-            break;
-
-        case 0x533: // EGT highest
-            if (len < 8) return false;
-            ecu.egt_highest_c = u16_le(d, 6);
             break;
 
         case 0x534: // ECU temp/errors/lost sync, EGT delta
@@ -263,26 +208,21 @@ static bool decodeCanData(const twai_message_t* msg)
             ecu.ecu_lost_sync_count = u16_le(d, 6);
             break;
 
-        case 0x536: // Gear, boost duty, oil pressure/temp
-            if (len < 8) return false;
-            ecu.gear                 = (int16_t)u16_le(d, 0);
-            ecu.boost_duty_x10       = u16_le(d, 2);
-            ecu.oil_pressure_kpa_x10 = u16_le(d, 4);
-            ecu.oil_temp_c_x10       = i16_le(d, 6);
-            break;
-
-        case 0x537: // Fuel pressure, wastegate pressure, coolant pressure, boost target
+        case 0x537: // Fuel pressure, coolant pressure
             if (len < 8) return false;
             ecu.fuel_pressure_kpa_x10      = u16_le(d, 0);
-            ecu.wastegate_pressure_kpa_x10 = u16_le(d, 2);
             ecu.coolant_pressure_kpa_x10   = u16_le(d, 4);
-            ecu.boost_target_kpa_x10       = u16_le(d, 6);
             break;
 
-        case 0x538: // Optional user channel / brake pressure mapping from your old DataAcq task
-            // Not currently placed in the telemetry packets. Keep this case here if you map
-            // User_Channel_1 to brake pressure in MTune later.
-            decoded = false;
+        case 0x538: // Brake Pressure
+            ecu.brake_pressure_kpa_x10 = u16_le(d, 0);
+            break;
+
+        case 0x600: // Acceleration (IMU)
+            if (len < 8) return false;
+            ecu.acceleration_x_mg = i16_le(d, 0);
+            ecu.acceleration_y_mg = i16_le(d, 2);
+            ecu.acceleration_z_mg = i16_le(d, 4);
             break;
 
         default:
@@ -296,7 +236,7 @@ static bool decodeCanData(const twai_message_t* msg)
     }
 
     return decoded;
-}
+} 
 
 static bool sendTelemetryPacket(QueueHandle_t queue, const TelemetryPacket& packet)
 {
@@ -312,45 +252,19 @@ static uint16_t buildAlertFlags()
 {
     uint16_t flags = ALERT_NONE;
 
-    if (ecu.status_bits != lastStatusBits) {
+    if (ecu.status_bits != lastStatusBits) 
+    {
         flags |= ALERT_STATUS_CHANGED;
     }
 
-    if (ecu.status_bits & ECU_STATUS_KNOCK_DETECTED) {
-        flags |= ALERT_KNOCK_DETECTED;
-    }
-
-    if (ecu.ecu_error_count != lastEcuErrorCount) {
+    if (ecu.ecu_error_count != lastEcuErrorCount) 
+    {
         flags |= ALERT_ECU_ERROR_CHANGED;
     }
 
-    if (ecu.ecu_lost_sync_count != lastLostSyncCount) {
+    if (ecu.ecu_lost_sync_count != lastLostSyncCount) 
+    {
         flags |= ALERT_LOST_SYNC_CHANGED;
-    }
-
-    if ((ecu.rpm >= OIL_PRESSURE_CHECK_MIN_RPM) &&
-        (ecu.oil_pressure_kpa_x10 > 0) &&
-        (ecu.oil_pressure_kpa_x10 < OIL_PRESSURE_LOW_KPA_X10)) {
-        flags |= ALERT_OIL_PRESSURE_LOW;
-    }
-
-    if ((ecu.fuel_pressure_kpa_x10 > 0) &&
-        (ecu.fuel_pressure_kpa_x10 < FUEL_PRESSURE_LOW_KPA_X10)) {
-        flags |= ALERT_FUEL_PRESSURE_LOW;
-    }
-
-    if (ecu.coolant_temp_c_x10 >= COOLANT_TEMP_HIGH_C_X10) {
-        flags |= ALERT_COOLANT_TEMP_HIGH;
-    }
-
-    if ((ecu.battery_v_x100 > 0) &&
-        (ecu.battery_v_x100 <= BATTERY_LOW_V_X100)) {
-        flags |= ALERT_BATTERY_LOW;
-    }
-
-    if ((ecu.tps_x10 >= LAMBDA_ERROR_CHECK_MIN_TPS_X10) &&
-        (abs_i16(ecu.lambda_error_x1000) >= LAMBDA_ERROR_HIGH_X1000)) {
-        flags |= ALERT_LAMBDA_ERROR_HIGH;
     }
 
     return flags;
@@ -369,12 +283,10 @@ static void sendFastPacket(QueueHandle_t queue)
     p.map_kpa_x10           = ecu.map_kpa_x10;
     p.lambda_avg_x1000      = ecu.lambda_avg_x1000;
     p.lambda_error_x1000    = ecu.lambda_error_x1000;
-    p.oil_pressure_kpa_x10  = ecu.oil_pressure_kpa_x10;
     p.fuel_pressure_kpa_x10 = ecu.fuel_pressure_kpa_x10;
     p.coolant_temp_c_x10    = ecu.coolant_temp_c_x10;
     p.battery_v_x100        = ecu.battery_v_x100;
     p.vehicle_speed_kph_x10 = ecu.vehicle_speed_kph_x10;
-    p.gear                  = ecu.gear;
     p.status_bits           = ecu.status_bits;
 
     sendTelemetryPacket(queue, packet);
@@ -388,26 +300,12 @@ static void sendSlowPacket(QueueHandle_t queue)
     TelemetrySlowPacket& p = packet.data.slow;
     p.ms                         = millis();
     p.seq                        = telemetrySeq++;
-    p.oil_temp_c_x10             = ecu.oil_temp_c_x10;
     p.intake_air_temp_c_x10      = ecu.intake_air_temp_c_x10;
-    p.fuel_inj_duty_x10          = ecu.fuel_inj_duty_x10;
-    p.fuel_trim_total_x10        = ecu.fuel_trim_total_x10;
-    p.lambda_corr_a_x10          = ecu.lambda_corr_a_x10;
-    p.lambda_corr_b_x10          = ecu.lambda_corr_b_x10;
-    p.ignition_timing_deg_x10    = ecu.ignition_timing_deg_x10;
-    p.ignition_cut_percent       = ecu.ignition_cut_percent;
-    p.fuel_cut_percent           = ecu.fuel_cut_percent;
     p.ecu_error_count            = ecu.ecu_error_count;
     p.ecu_lost_sync_count        = ecu.ecu_lost_sync_count;
     p.ecu_temp_c                 = ecu.ecu_temp_c;
-    p.egt_highest_c              = ecu.egt_highest_c;
     p.egt_delta_c                = ecu.egt_delta_c;
-    p.knock_count                = ecu.knock_count;
-    p.knock_correction_deg_x10   = ecu.knock_correction_deg_x10;
-    p.boost_target_kpa_x10       = ecu.boost_target_kpa_x10;
-    p.boost_duty_x10             = ecu.boost_duty_x10;
     p.coolant_pressure_kpa_x10   = ecu.coolant_pressure_kpa_x10;
-    p.wastegate_pressure_kpa_x10 = ecu.wastegate_pressure_kpa_x10;
 
     sendTelemetryPacket(queue, packet);
 }
@@ -420,10 +318,10 @@ static void sendEventPacketIfNeeded(QueueHandle_t queue)
         (alertFlags != lastAlertFlags) ||
         (ecu.status_bits != lastStatusBits) ||
         (ecu.ecu_error_count != lastEcuErrorCount) ||
-        (ecu.ecu_lost_sync_count != lastLostSyncCount) ||
-        (ecu.knock_count != lastKnockCount);
+        (ecu.ecu_lost_sync_count != lastLostSyncCount);
 
-    if (!shouldSend) {
+    if (!shouldSend) 
+    {
         return;
     }
 
@@ -436,14 +334,11 @@ static void sendEventPacketIfNeeded(QueueHandle_t queue)
     p.alert_flags           = alertFlags;
     p.status_bits           = ecu.status_bits;
     p.rpm                   = ecu.rpm;
-    p.oil_pressure_kpa_x10  = ecu.oil_pressure_kpa_x10;
     p.fuel_pressure_kpa_x10 = ecu.fuel_pressure_kpa_x10;
     p.coolant_temp_c_x10    = ecu.coolant_temp_c_x10;
     p.battery_v_x100        = ecu.battery_v_x100;
-    p.lambda_error_x1000    = ecu.lambda_error_x1000;
     p.ecu_error_count       = ecu.ecu_error_count;
     p.ecu_lost_sync_count   = ecu.ecu_lost_sync_count;
-    p.knock_count           = ecu.knock_count;
 
     sendTelemetryPacket(queue, packet);
 
@@ -451,7 +346,6 @@ static void sendEventPacketIfNeeded(QueueHandle_t queue)
     lastStatusBits = ecu.status_bits;
     lastEcuErrorCount = ecu.ecu_error_count;
     lastLostSyncCount = ecu.ecu_lost_sync_count;
-    lastKnockCount = ecu.knock_count;
 }
 
 static void sendPeriodicPacketsIfDue(QueueHandle_t queue)
@@ -484,7 +378,8 @@ void CANTask(void* pvParameters)
 
     Serial.println("[CAN] Task started");
 
-    if (!initCAN()) {
+    if (!initCAN()) 
+    {
         Serial.println("[CAN] Init failed; deleting task");
         vTaskDelete(nullptr);
         return;
@@ -492,7 +387,8 @@ void CANTask(void* pvParameters)
 
     twai_message_t rxMsg = {};
 
-    for (;;) {
+    for (;;) 
+    {
         const esp_err_t err = twai_receive(&rxMsg, portMAX_DELAY);
 
         if (err != ESP_OK) {
