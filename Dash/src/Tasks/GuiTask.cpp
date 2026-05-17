@@ -12,7 +12,6 @@
 #include <drivers/lcd/esp_panel_lcd_st7262.hpp>
 
 #include "UI/ui_rpm.h"
-#include "UI/ui_speed.h"
 #include "UI/ui_clt.h"
 #include "UI/ui_battery_voltage.h"
 #include "UI/ui_tps.h"
@@ -97,7 +96,6 @@ void GuiTask(void* pvParameters) {
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
         // Format init
         ui_rpm_init();
-        ui_speed_init();
         ui_clt_init();
         ui_battery_voltage_init();
         ui_tps_init();
@@ -131,9 +129,6 @@ void GuiTask(void* pvParameters) {
             if (update_status) {
                 if(dataGui.rpm != dataGui_prev.rpm) {
                     ui_rpm_update(&dataGui);
-                }
-                if(dataGui.speed != dataGui_prev.speed) {
-                    ui_speed_update(&dataGui);
                 }
                 if(dataGui.clt != dataGui_prev.clt) {
                     ui_clt_update(&dataGui);
