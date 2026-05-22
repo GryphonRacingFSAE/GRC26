@@ -12,8 +12,8 @@ typedef struct {
     QueueHandle_t* dataQueue;
 } DataAcqTaskParameters;
 
-/* IMUData_t
- * @brief: Struct to hold the latest IMU data read from the ICM-20948. Contains accelerometer and gyroscope readings along with an "updated" flag.
+/* IMUGPSData_t
+ * @brief: Struct to hold the latest IMU and GPS data read from the respective modules. Contains accelerometer and gyroscope readings along with GPS location and navigation data.
  * Note: Accel units: milli g's, Gyro (for testing) units: degrees per second, Latitude/Longitude units: degrees, Speed units: km/h, Course units: degrees
 */
 typedef struct {

@@ -10,6 +10,7 @@
 #define DATA_TASK_PERIOD_MS 20
 #define IMU_SPI_FREQUENCY 4000000
 
+// By default +/- 2g accel range, +/- 250 dps gyro range.
 static ICM_20948_SPI imu;
 static TinyGPSPlus gps;
 
@@ -29,6 +30,10 @@ static void initIMU() {
         imu.begin(IMU_CS, SPI, IMU_SPI_FREQUENCY);
         Serial.printf("[IMU] WHO_AM_I = 0x%02X (expected 0xEA)\n", imu.getWhoAmI());
         if (imu.status == ICM_20948_Stat_Ok) {
+            ICM_20948_fss_t myFSS; 
+            myFSS.a = gpm4; // +/- 4g 
+            myFSS.g = dps250; // +/- 250 dps
+            imu.setFullScale(ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr, myFSS);
             break;
         }
         Serial.printf("[IMU] IMU init failed (%s), retrying in 500 ms...\n", imu.statusString());
@@ -70,32 +75,39 @@ static void initGPS() {
     Serial.println("[GPS] Initializing GPS...");
 }
 
-/* static void drainGPSSerial()
- * @brief: Feeds all pending UART bytes into TinyGPS++ without blocking. Called every task iteration so no bytes are left in the hardware FIFO.
+/* static void buildGPSPacket(IMUGPSData_t& gpsData)
+ * @brief: Reads data from the GPS module and populates an IMUGPSData_t struct. Sets the "updated" flag if new GPS data was read successfully.
+ * @param: gpsData - Reference to an IMUGPSData_t struct to populate with the latest GPS readings. The "gps_updated" flag will be set to true if new GPS data was successfully read and parsed.
 */
-static void drainGPSSerial() {
-    while(Serial0.available() > 0) {
-        gps.encode(Serial0.read());
-    }
-}
 
 static void buildGPSPacket(IMUGPSData_t& gpsData) {
     gpsData.gps_updated = false;
 
-    drainGPSSerial(); 
+    while (Serial0.available() > 0) {
+        char c = Serial0.read();
 
-    gpsData.gps_updated = gps.location.isUpdated(); 
+        // // For debugging: print raw GPS data to serial monitor
+        // Serial.print(c); 
+        
+        if (gps.encode(c)) {
+            if (gps.location.isUpdated()) {
+                gpsData.gps_updated = true;
+            }
+        }
+    }
 
-    if (gpsData.gps_updated) {
+    gpsData.valid = gps.location.isValid();
+
+    if (gpsData.valid) {
         gpsData.latitude = (float)gps.location.lat();
         gpsData.longitude = (float)gps.location.lng();
         gpsData.speed = gps.speed.isValid() ? (float)gps.speed.kmph() : 0.0f;
         gpsData.course = gps.course.isValid() ? (float)gps.course.deg() : 0.0f;
-        Serial.println("[GPS] GPS lat = " + String(gpsData.latitude, 6) + ", lng = " + String(gpsData.longitude, 6) + " speed = " + String(gpsData.speed) + " km/h, course = " + String(gpsData.course) + " deg, valid = " + String(gpsData.valid));
-    } else {
-        Serial.println("[GPS] WARNING: GPS data invalid");
     }
-    // Serial.println("[GPS] GPS updated = " + String(gpsData.gps_updated) + ", location age = " + String(gps.location.age()) + " ms");
+
+    if (gpsData.gps_updated && gpsData.valid) {
+        Serial.println("[GPS] GPS Latitude = " + String(gpsData.latitude, 6) + ", Longitude = " + String(gpsData.longitude, 6) + ", Speed = " + String(gpsData.speed) + " km/h, Course = " + String(gpsData.course) + " degrees");
+    }
 }
 
 void DataAcqTask(void* pvParameters) {
