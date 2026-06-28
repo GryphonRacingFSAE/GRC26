@@ -5,8 +5,6 @@
 #include <TinyGPS++.h>
 #include <PinDefs.h> 
 
-#include "driver/uart.h"
-
 #define DATA_TASK_PERIOD_MS 20
 #define IMU_SPI_FREQUENCY 4000000
 
@@ -31,8 +29,8 @@ static void initIMU() {
         Serial.printf("[IMU] WHO_AM_I = 0x%02X (expected 0xEA)\n", imu.getWhoAmI());
         if (imu.status == ICM_20948_Stat_Ok) {
             ICM_20948_fss_t myFSS; 
-            myFSS.a = gpm4; // +/- 4g 
-            myFSS.g = dps250; // +/- 250 dps
+            myFSS.a = gpm4;
+            myFSS.g = dps250;
             imu.setFullScale(ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr, myFSS);
             break;
         }

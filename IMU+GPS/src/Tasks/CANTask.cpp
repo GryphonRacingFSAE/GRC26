@@ -11,11 +11,10 @@
 #define CAN_ID_SPEED_COURSE 0x603
 
 #define CAN_TX_TIMEOUT_MS 10
-#define CAN_TASK_PERIOD_MS 50
 
 #define IMU_SCALE_FACTOR 1.0f
-#define LAT_LNG_SCALE_FACTOR 1000000.0f // When decoding: gps = gps / 1000000.0f 
-#define SPEED_COURSE_SCALE_FACTOR 10.0f // When decoding: gps = gps / 10.0f
+#define LAT_LNG_SCALE_FACTOR 1000000.0f // When decoding: lat = lat / 1000000.0f 
+#define SPEED_COURSE_SCALE_FACTOR 10.0f // When decoding: speed = speed / 10.0f
 
 #define FRAME_LEN 8
 
@@ -179,23 +178,20 @@ void CANTask(void* pvParameters) {
     initCAN();
     IMUGPSData_t packet;
 
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(CAN_TASK_PERIOD_MS);
-
     for (;;) {
         if (xQueueReceive(data_queue, &packet, pdMS_TO_TICKS(CAN_TX_TIMEOUT_MS)) != pdTRUE) {
             continue;
         }
 
-        if(!packet.imu_updated || !packet.gps_updated) {
-            Serial.println("[CAN] WARNING: Stale data");
-            continue;
+        if(packet.imu_updated) {
+            transmitint16Frame(CAN_ID_ACCEL, packet.accel_x, packet.accel_y, packet.accel_z, 0, IMU_SCALE_FACTOR);
+            transmitint16Frame(CAN_ID_GYRO, packet.gyro_x, packet.gyro_y, packet.gyro_z, 0, IMU_SCALE_FACTOR);
         }
 
-        transmitint16Frame(CAN_ID_ACCEL, packet.accel_x, packet.accel_y, packet.accel_z, 0, IMU_SCALE_FACTOR);
-        transmitint16Frame(CAN_ID_GYRO, packet.gyro_x, packet.gyro_y, packet.gyro_z, 0, IMU_SCALE_FACTOR);
-        transmitint32Frame(CAN_ID_LAT_LNG, packet.latitude, packet.longitude, LAT_LNG_SCALE_FACTOR);
-        transmitint16Frame(CAN_ID_SPEED_COURSE, packet.speed, packet.course, 0, 0, SPEED_COURSE_SCALE_FACTOR, false);
+        if(packet.gps_updated && packet.valid) {
+            transmitint32Frame(CAN_ID_LAT_LNG, packet.latitude, packet.longitude, LAT_LNG_SCALE_FACTOR);
+            transmitint16Frame(CAN_ID_SPEED_COURSE, packet.speed, packet.course, 0, 0, SPEED_COURSE_SCALE_FACTOR, false);
+        }
         // TODO: Transmit data to CAN Bus here
     }
 }
