@@ -16,6 +16,7 @@
 #include "UI/ui_battery_voltage.h"
 #include "UI/ui_tps.h"
 #include "UI/ui_bp.h"
+#include "UI/ui_oil.h"
 
 #define GUI_TASK_PERIOD_MS 15 // 67Hz Refresh
 
@@ -100,6 +101,7 @@ void GuiTask(void* pvParameters) {
         ui_battery_voltage_init();
         ui_tps_init();
         ui_bp_init();
+        ui_oil_init();
         // Logo init 
         lv_obj_t* grc_logo = lv_img_create(lv_scr_act());
         lv_img_set_src(grc_logo, &banner);
@@ -141,6 +143,10 @@ void GuiTask(void* pvParameters) {
                 }
                 if(dataGui.bp != dataGui_prev.bp) {
                     ui_bp_update(&dataGui);
+                }
+                if(dataGui.oilPressure != dataGui_prev.oilPressure ||
+                   dataGui.oilTemperature != dataGui_prev.oilTemperature) {
+                    ui_oil_update(&dataGui);
                 }
 
                 dataGui_prev = dataGui;

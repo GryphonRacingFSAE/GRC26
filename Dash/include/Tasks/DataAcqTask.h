@@ -91,7 +91,7 @@ typedef struct {
     float clt;
     float batteryVoltage;
     float oilPressure;
-    bool oilPressure_flag;
+    float oilTemperature;
     uint16_t bp;
 } EcuData_t;
 
