@@ -4,8 +4,10 @@
 #include <lv_conf.h>
 #include <lvgl.h>
 
+LV_FONT_DECLARE(lv_font_montserrat_96);
+
 static constexpr int16_t OIL_X = 50;
-static constexpr int16_t OIL_PRESSURE_Y = -45;
+static constexpr int16_t OIL_PRESSURE_Y = -90;
 static constexpr int16_t OIL_TEMPERATURE_Y = 30;
 static constexpr int16_t CAPTION_GAP = 4;
 
@@ -26,19 +28,19 @@ void ui_oil_init() {
     oil_temperature_ui = lv_label_create(lv_scr_act());
 
     lv_label_set_text(oil_pressure_label, "0.0");
-    set_label_style(oil_pressure_label, &lv_font_montserrat_36);
+    set_label_style(oil_pressure_label, &lv_font_montserrat_96);
     lv_obj_align(oil_pressure_label, LV_ALIGN_LEFT_MID, OIL_X, OIL_PRESSURE_Y);
 
     lv_label_set_text(oil_pressure_ui, "Oil kPa");
-    set_label_style(oil_pressure_ui, &lv_font_montserrat_18);
+    set_label_style(oil_pressure_ui, &lv_font_montserrat_36);
     lv_obj_align_to(oil_pressure_ui, oil_pressure_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, CAPTION_GAP);
 
     lv_label_set_text(oil_temperature_label, "0.0");
-    set_label_style(oil_temperature_label, &lv_font_montserrat_36);
+    set_label_style(oil_temperature_label, &lv_font_montserrat_96);
     lv_obj_align(oil_temperature_label, LV_ALIGN_LEFT_MID, OIL_X, OIL_TEMPERATURE_Y);
 
     lv_label_set_text(oil_temperature_ui, "Oil \xC2\xB0" "C");
-    set_label_style(oil_temperature_ui, &lv_font_montserrat_18);
+    set_label_style(oil_temperature_ui, &lv_font_montserrat_36);
     lv_obj_align_to(oil_temperature_ui, oil_temperature_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, CAPTION_GAP);
 }
 
