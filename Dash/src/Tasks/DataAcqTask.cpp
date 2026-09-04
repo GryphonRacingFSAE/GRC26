@@ -64,7 +64,7 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
 
                 uint16_t oilPressure_raw = (msg->data[5] << 8) | msg->data[4];
                 int16_t oilTemperature_raw = static_cast<int16_t>((msg->data[7] << 8) | msg->data[6]);
-                dataOut->oilPressure = oilPressure_raw * 0.1f;
+                dataOut->oilPressure = oilPressure_raw * 0.1f * 0.145038f; // Convert kPa to PSI
                 dataOut->oilTemperature = oilTemperature_raw * 0.1f;
                 break;
             }

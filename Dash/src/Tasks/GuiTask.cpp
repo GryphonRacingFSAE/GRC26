@@ -18,7 +18,7 @@
 #include "UI/ui_bp.h"
 #include "UI/ui_oil.h"
 
-#define GUI_TASK_PERIOD_MS 15 // 67Hz Refresh
+#define GUI_TASK_PERIOD_MS 30 // 33Hz Refresh
 
 using namespace esp_panel::drivers;
 
