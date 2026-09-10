@@ -6,7 +6,7 @@
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
-static constexpr int16_t OIL_X = 50;
+static constexpr int16_t OIL_X = 25;
 static constexpr int16_t OIL_PRESSURE_Y = -90;
 static constexpr int16_t OIL_TEMPERATURE_Y = 30;
 static constexpr int16_t CAPTION_GAP = 4;

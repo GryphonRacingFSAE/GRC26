@@ -7,7 +7,7 @@
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
-static constexpr int8_t marginX = 25;
+static constexpr int8_t marginX = 50;
 static constexpr int8_t marginY = 25;
 static constexpr int8_t CAPTION_GAP = 4;
 
