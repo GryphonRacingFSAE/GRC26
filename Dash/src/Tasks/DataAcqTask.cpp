@@ -48,7 +48,7 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
                 dataOut->wheelSpeed = wss_raw * 0.1f;
                 break;
             }
-        case 0x530: // Coolant Temp + Battery Voltage
+        case 0x530: // Coolant Temp
             {
                 uint16_t batteryVoltage_raw = (msg->data[1] << 8) | msg->data[0];
                 uint16_t clt_raw = (msg->data[7] << 8) | msg->data[6];
@@ -56,10 +56,16 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
                 dataOut->clt = clt_raw * 0.1f;
                 break;
             }    
-        case 0x536: // Oil Pressure
+        case 0x536: // Oil Pressure + Oil Temperature
             {
+                if(msg->data_length_code < 8) {
+                    break;
+                }
+
                 uint16_t oilPressure_raw = (msg->data[5] << 8) | msg->data[4];
-                dataOut->oilPressure = oilPressure_raw * 0.1f;
+                int16_t oilTemperature_raw = static_cast<int16_t>((msg->data[7] << 8) | msg->data[6]);
+                dataOut->oilPressure = oilPressure_raw * 0.1f * 0.145038f; // Convert kPa to PSI
+                dataOut->oilTemperature = oilTemperature_raw * 0.1f;
                 break;
             }
         case 0x538: // Brake Pressure
@@ -76,6 +82,7 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
 void DataAcqTask(void* pvParameters) {
     DataAcqTaskParameters* params = (DataAcqTaskParameters*)pvParameters;
     QueueHandle_t data_queue = *(params->dataQueue);
+    QueueHandle_t peripheral_queue = *(params->peripheralQueue);
     initCAN();
     twai_message_t rx_msg;
 
@@ -94,5 +101,6 @@ void DataAcqTask(void* pvParameters) {
 
         DecodeCanData(&rx_msg, &data);
         xQueueSend(data_queue, &data, 0); 
+        xQueueSend(peripheral_queue, &data, 0); 
     }
 }
