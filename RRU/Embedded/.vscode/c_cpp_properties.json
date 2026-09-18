@@ -8,13 +8,13 @@
         {
             "name": "PlatformIO",
             "includePath": [
-                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include",
-                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/src",
-                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/.pio/libdeps/esp32-s3-devboard/RadioLib/src",
+                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include",
+                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/src",
+                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/.pio/libdeps/esp32-s3-devboard/RadioLib/src",
                 "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/libraries/SPI/src",
-                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include/Tasks",
-                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include/Defines",
-                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include/Utils",
+                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include/Tasks",
+                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include/Defines",
+                "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include/Utils",
                 "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/tools/esp32-arduino-libs/esp32s3/include/newlib/platform_include",
                 "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/tools/esp32-arduino-libs/esp32s3/include/freertos/config/include",
                 "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/tools/esp32-arduino-libs/esp32s3/include/freertos/config/include/freertos",
@@ -279,13 +279,13 @@
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
-                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include",
-                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/src",
-                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/.pio/libdeps/esp32-s3-devboard/RadioLib/src",
+                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include",
+                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/src",
+                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/.pio/libdeps/esp32-s3-devboard/RadioLib/src",
                     "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/libraries/SPI/src",
-                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include/Tasks",
-                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include/Defines",
-                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/include/Utils",
+                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include/Tasks",
+                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include/Defines",
+                    "C:/Users/riyan/Documents/GitHub/GRC26/RRU/Embedded/include/Utils",
                     "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/tools/esp32-arduino-libs/esp32s3/include/newlib/platform_include",
                     "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/tools/esp32-arduino-libs/esp32s3/include/freertos/config/include",
                     "C:/Users/riyan/.platformio/packages/framework-arduinoespressif32@src-1456292c9a794fb9d33ccb11ed079928/tools/esp32-arduino-libs/esp32s3/include/freertos/config/include/freertos",
@@ -549,7 +549,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=60119",
+                "PLATFORMIO=60200",
                 "ARDUINO_ESP32S3_DEV",
                 "ARDUINO_USB_MODE=1",
                 "ARDUINO_RUNNING_CORE=1",
