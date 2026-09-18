@@ -4,10 +4,13 @@
 #include <string>
 #include <vector>
 
+void testSerialPrinted();
+
 struct TestSerial {
     std::vector<std::string> lines;
     void println(const char* text)
     {
+        testSerialPrinted();
         lines.emplace_back(text);
     }
 };

@@ -14,7 +14,7 @@ measurement data.
 
 | Packet | Type | Version 1 body bytes | Version 2 body bytes | Version 2 nominal cadence |
 | --- | --- | --- | --- | --- |
-| FAST | 1 | 30 | 28 | Every 500 ms |
+| FAST | 1 | 30 | 28 | Every 20 ms (50 Hz) |
 | SLOW | 2 | 46 | 32 | Every 2,000 ms |
 | EVENT | 3 | 28 | 46 | On qualifying transitions |
 | POWERTRAIN | 4 | Unsupported | 58 | Every 6,000 ms |
@@ -25,7 +25,11 @@ signals, its slow packet contains temperatures, pressures and counters, and its
 powertrain packet contains the additional engine, traction and acceleration
 signals. Events include current cut and knock measurements for timely updates.
 The table describes sender generation intervals; radio airtime and queueing can
-delay actual packet arrival.
+delay actual packet arrival. With no losses, periodic output averages 50.667 rows/s
+plus events. The receiver prints each packet once; it does not duplicate cached
+rows on a 50 Hz timer. Sender snapshots continue after CAN silence, with freshness
+bits clearing as sources age beyond 2,000 ms; 50 Hz transport does not imply that
+every source CAN signal updates at 50 Hz.
 
 Version 2 speed comes from CAN `0x522`; brake pressure retains the configured
 `0x538` mapping. CSV measurements use engineering units indicated by their column
@@ -120,11 +124,23 @@ header but its topic/field lists omit POWERTRAIN and the newly added signals.
 
 ## Runtime and verification
 
-Radio frequency and modulation settings are unchanged: 915 MHz, 125 kHz
-bandwidth, spreading factor 9, coding rate 4/7, private sync word and an eight
-symbol preamble. The 255-byte receive buffer fits every supported frame. The
-receiver runs a single LoRa task, prints directly to serial and has no packet
-queue. Legacy `Outputs`/`LoRaOutputs` files are not used by this path. A bounded,
+Both boards now use 915 MHz, 500 kHz bandwidth, spreading factor 6, coding rate
+4/5, private sync word and a 12-symbol preamble. Transmit power remains 14 dBm.
+The preamble length follows the LR1121 SF5/SF6 recommendation. Both boards must
+use this profile together; old SF9/125 kHz firmware will not receive it even
+though the CSV and packet schemas have not changed. FAST airtime is 11.680 ms,
+and periodic packets consume about 59.317% RF airtime. Including the sender's
+3 ms gap between transmissions raises modeled occupancy to 74.517%, before
+polling/setup overhead and events. See the RTU protocol specification for the
+calculation and the 1 km field-validation target. Range and sustained throughput
+have not been measured on the hardware.
+
+The 255-byte receive buffer fits every supported frame. The receiver polls each
+RTOS tick (1 ms in this build), captures the completed packet's timestamp/RSSI/SNR,
+and rearms before CSV formatting and serial printing. It runs a single LoRa task,
+prints directly to serial and has no packet queue. A host that stops draining USB
+can still cause backpressure and packet loss; rearming does not provide an
+unbounded radio buffer. Legacy `Outputs`/`LoRaOutputs` files are not used by this path. A bounded,
 reused 2,048-byte CSV buffer avoids growing the LoRa task's stack with the
 expanded schema.
 
@@ -145,7 +161,8 @@ It builds under `.pio/native-tests` and covers version 1 compatibility, all four
 version 2 packet types, RTU wire fixtures, signed values, malformed frames,
 missing/stale sources, status/event meanings, CSV scales and bounded output.
 Task integration tests compile the actual LoRa task with radio/serial fakes and
-exercise packet output, errors, busy polling, quiet timeouts, receive rearming,
-start-failure backoff and header/init behavior.
+exercise packet output, errors, busy polling, quiet timeouts, metadata capture
+and receive rearming before serial output, start-failure backoff and header/init
+behavior.
 Firmware compilation and native tests do not replace CAN/RF testing on both
 physical boards.

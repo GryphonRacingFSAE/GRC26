@@ -41,10 +41,12 @@ the optional sanitizer mode was not run.
 The second program includes the real receiver LoRa task with small host substitutes
 for Arduino, RadioLib and task initialization. It exercises RF polling, V1 and V2
 CSV dispatch, malformed packets, CRC/read failures, timeout rearming, start-receive
-retry delay, and one-time startup/header behavior. No transmit API is available
-in its radio substitute.
+retry delay, and one-time startup/header behavior. It also checks that metadata
+is captured before rearming, reception restarts before serial output, rearm
+failures preserve the completed packet, and 50 consecutive FAST packets each
+produce exactly one row. No transmit API is available in its radio substitute.
 
-The validated run passed **201,193 native checks** and **139 integration checks
-in seven groups**. A PlatformIO receiver firmware build is also required to check
+The validated run passed **201,193 native checks** and **1,057 integration checks
+in nine groups**. A PlatformIO receiver firmware build is also required to check
 ESP32 compilation. These tests do not establish hardware RF delivery or vehicle
 timing performance.

@@ -99,16 +99,46 @@ static void sendPeriodicPacketsIfDue(QueueHandle_t queue)
     const uint32_t now = millis();
     if ((uint32_t)(now - lastFastTxMs) >= TELEMETRY_FAST_PERIOD_MS) {
         sendFastPacket(queue, now);
-        lastFastTxMs = now;
+        // Preserve the deadline phase while skipping missed slots, never catch up in a burst.
+        lastFastTxMs += ((uint32_t)(now - lastFastTxMs) / TELEMETRY_FAST_PERIOD_MS) * TELEMETRY_FAST_PERIOD_MS;
     }
     if ((uint32_t)(now - lastSlowTxMs) >= TELEMETRY_SLOW_PERIOD_MS) {
         sendSlowPacket(queue, now);
-        lastSlowTxMs = now;
+        lastSlowTxMs += ((uint32_t)(now - lastSlowTxMs) / TELEMETRY_SLOW_PERIOD_MS) * TELEMETRY_SLOW_PERIOD_MS;
     }
     if ((uint32_t)(now - lastPowertrainTxMs) >= TelemetryV2::POWERTRAIN_PERIOD_MS) {
         sendPowertrainPacket(queue, now);
-        lastPowertrainTxMs = now;
+        lastPowertrainTxMs += ((uint32_t)(now - lastPowertrainTxMs) / TelemetryV2::POWERTRAIN_PERIOD_MS) *
+                              TelemetryV2::POWERTRAIN_PERIOD_MS;
     }
+}
+
+static uint32_t timeUntilPacket(uint32_t now, uint32_t lastDeadline, uint32_t period)
+{
+    const uint32_t elapsed = now - lastDeadline;
+    return elapsed >= period ? 0 : period - elapsed;
+}
+
+static TickType_t telemetryReceiveWaitTicks()
+{
+    if (!ecu.hasCanData) {
+        return portMAX_DELAY;
+    }
+    const uint32_t now = millis();
+    uint32_t waitMs = timeUntilPacket(now, lastFastTxMs, TELEMETRY_FAST_PERIOD_MS);
+    const uint32_t slowWaitMs = timeUntilPacket(now, lastSlowTxMs, TELEMETRY_SLOW_PERIOD_MS);
+    const uint32_t powertrainWaitMs = timeUntilPacket(now, lastPowertrainTxMs, TelemetryV2::POWERTRAIN_PERIOD_MS);
+    if (slowWaitMs < waitMs) {
+        waitMs = slowWaitMs;
+    }
+    if (powertrainWaitMs < waitMs) {
+        waitMs = powertrainWaitMs;
+    }
+    if (waitMs == 0) {
+        return 0;
+    }
+    const TickType_t waitTicks = pdMS_TO_TICKS(waitMs);
+    return waitTicks > 0 ? waitTicks : 1;
 }
 
 void CANTask(void* pvParameters)
@@ -127,15 +157,17 @@ void CANTask(void* pvParameters)
 
     twai_message_t rxMsg = {};
     for (;;) {
-        const esp_err_t err = twai_receive(&rxMsg, portMAX_DELAY);
-        if (err != ESP_OK) {
-            // Do not spin aggressively if TWAI returns an error.
+        // Send on deadlines even when CAN is silent or unrelated/invalid frames arrive.
+        // Cached values retain their per-source freshness status in every snapshot.
+        sendPeriodicPacketsIfDue(telemetryQueue);
+        const esp_err_t err = twai_receive(&rxMsg, telemetryReceiveWaitTicks());
+        if (err == ESP_OK) {
+            if (decodeCanData(&rxMsg)) {
+                sendEventPacketIfNeeded(telemetryQueue);
+            }
+        } else if (err != ESP_ERR_TIMEOUT) {
+            // A normal deadline timeout needs no extra delay; back off real driver errors.
             vTaskDelay(pdMS_TO_TICKS(CAN_TASK_PERIOD_MS));
-            continue;
-        }
-        if (decodeCanData(&rxMsg)) {
-            sendEventPacketIfNeeded(telemetryQueue);
-            sendPeriodicPacketsIfDue(telemetryQueue);
         }
     }
 }

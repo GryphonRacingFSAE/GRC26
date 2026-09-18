@@ -8,6 +8,7 @@ using esp_err_t = int;
 constexpr esp_err_t ESP_OK = 0;
 constexpr esp_err_t ESP_ERR_INVALID_STATE = 1;
 constexpr esp_err_t ESP_FAIL = 2;
+constexpr esp_err_t ESP_ERR_TIMEOUT = 3;
 
 enum twai_mode_t { TWAI_MODE_NORMAL, TWAI_MODE_NO_ACK, TWAI_MODE_LISTEN_ONLY };
 

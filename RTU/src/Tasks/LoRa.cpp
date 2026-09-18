@@ -13,6 +13,7 @@ static constexpr uint8_t TELEMETRY_VERSION = 1; // Legacy RX; TX uses TelemetryV
 static constexpr size_t TELEMETRY_MAX_RADIO_PAYLOAD = 96;
 
 static uint32_t txCount = 0;
+static uint32_t lastTxReportMs = 0;
 static uint32_t rxCount = 0;
 
 static uint16_t crc16_ccitt(const uint8_t* data, size_t len)
@@ -34,7 +35,8 @@ static uint16_t crc16_ccitt(const uint8_t* data, size_t len)
     return crc;
 }
 
-static bool validateRadioPayload(const uint8_t* data, size_t len, uint8_t* packetType, const uint8_t** payload, size_t* payloadLen)
+static bool validateRadioPayload(const uint8_t* data, size_t len, uint8_t* packetType, const uint8_t** payload,
+                                 size_t* payloadLen)
 {
     if (data == nullptr || packetType == nullptr || payload == nullptr || payloadLen == nullptr) {
         return false;
@@ -87,44 +89,74 @@ static void printPacketSummary(uint8_t type, const uint8_t* payload, size_t payl
         TelemetryFastPacket p;
         memcpy(&p, payload, sizeof(p));
 
-        Serial.print("  FAST seq="); Serial.print(p.seq);
-        Serial.print(" rpm="); Serial.print(p.rpm);
-        Serial.print(" tps_x10="); Serial.print(p.tps_x10);
-        Serial.print(" map_x10="); Serial.print(p.map_kpa_x10);
-        Serial.print(" lambda_x1000="); Serial.print(p.lambda_avg_x1000);
-        Serial.print(" lambda_err_x1000="); Serial.print(p.lambda_error_x1000);
-        Serial.print(" oilp_x10="); Serial.print(p.oil_pressure_kpa_x10);
-        Serial.print(" fuelp_x10="); Serial.print(p.fuel_pressure_kpa_x10);
-        Serial.print(" coolant_x10="); Serial.print(p.coolant_temp_c_x10);
-        Serial.print(" batt_x100="); Serial.print(p.battery_v_x100);
-        Serial.print(" speed_x10="); Serial.print(p.vehicle_speed_kph_x10);
-        Serial.print(" gear="); Serial.print(p.gear);
-        Serial.print(" status=0x"); Serial.println(p.status_bits, HEX);
+        Serial.print("  FAST seq=");
+        Serial.print(p.seq);
+        Serial.print(" rpm=");
+        Serial.print(p.rpm);
+        Serial.print(" tps_x10=");
+        Serial.print(p.tps_x10);
+        Serial.print(" map_x10=");
+        Serial.print(p.map_kpa_x10);
+        Serial.print(" lambda_x1000=");
+        Serial.print(p.lambda_avg_x1000);
+        Serial.print(" lambda_err_x1000=");
+        Serial.print(p.lambda_error_x1000);
+        Serial.print(" oilp_x10=");
+        Serial.print(p.oil_pressure_kpa_x10);
+        Serial.print(" fuelp_x10=");
+        Serial.print(p.fuel_pressure_kpa_x10);
+        Serial.print(" coolant_x10=");
+        Serial.print(p.coolant_temp_c_x10);
+        Serial.print(" batt_x100=");
+        Serial.print(p.battery_v_x100);
+        Serial.print(" speed_x10=");
+        Serial.print(p.vehicle_speed_kph_x10);
+        Serial.print(" gear=");
+        Serial.print(p.gear);
+        Serial.print(" status=0x");
+        Serial.println(p.status_bits, HEX);
     } else if (type == TELEMETRY_PACKET_SLOW && payloadLen == sizeof(TelemetrySlowPacket)) {
         TelemetrySlowPacket p;
         memcpy(&p, payload, sizeof(p));
 
-        Serial.print("  SLOW seq="); Serial.print(p.seq);
-        Serial.print(" oiltemp_x10="); Serial.print(p.oil_temp_c_x10);
-        Serial.print(" iat_x10="); Serial.print(p.intake_air_temp_c_x10);
-        Serial.print(" injduty_x10="); Serial.print(p.fuel_inj_duty_x10);
-        Serial.print(" trim_x10="); Serial.print(p.fuel_trim_total_x10);
-        Serial.print(" ecu_err="); Serial.print(p.ecu_error_count);
-        Serial.print(" lost_sync="); Serial.print(p.ecu_lost_sync_count);
-        Serial.print(" egt_high="); Serial.print(p.egt_highest_c);
-        Serial.print(" knock_count="); Serial.println(p.knock_count);
+        Serial.print("  SLOW seq=");
+        Serial.print(p.seq);
+        Serial.print(" oiltemp_x10=");
+        Serial.print(p.oil_temp_c_x10);
+        Serial.print(" iat_x10=");
+        Serial.print(p.intake_air_temp_c_x10);
+        Serial.print(" injduty_x10=");
+        Serial.print(p.fuel_inj_duty_x10);
+        Serial.print(" trim_x10=");
+        Serial.print(p.fuel_trim_total_x10);
+        Serial.print(" ecu_err=");
+        Serial.print(p.ecu_error_count);
+        Serial.print(" lost_sync=");
+        Serial.print(p.ecu_lost_sync_count);
+        Serial.print(" egt_high=");
+        Serial.print(p.egt_highest_c);
+        Serial.print(" knock_count=");
+        Serial.println(p.knock_count);
     } else if (type == TELEMETRY_PACKET_EVENT && payloadLen == sizeof(TelemetryEventPacket)) {
         TelemetryEventPacket p;
         memcpy(&p, payload, sizeof(p));
 
-        Serial.print("  EVENT seq="); Serial.print(p.seq);
-        Serial.print(" flags=0x"); Serial.print(p.alert_flags, HEX);
-        Serial.print(" status=0x"); Serial.print(p.status_bits, HEX);
-        Serial.print(" rpm="); Serial.print(p.rpm);
-        Serial.print(" oilp_x10="); Serial.print(p.oil_pressure_kpa_x10);
-        Serial.print(" fuelp_x10="); Serial.print(p.fuel_pressure_kpa_x10);
-        Serial.print(" coolant_x10="); Serial.print(p.coolant_temp_c_x10);
-        Serial.print(" lambda_err_x1000="); Serial.println(p.lambda_error_x1000);
+        Serial.print("  EVENT seq=");
+        Serial.print(p.seq);
+        Serial.print(" flags=0x");
+        Serial.print(p.alert_flags, HEX);
+        Serial.print(" status=0x");
+        Serial.print(p.status_bits, HEX);
+        Serial.print(" rpm=");
+        Serial.print(p.rpm);
+        Serial.print(" oilp_x10=");
+        Serial.print(p.oil_pressure_kpa_x10);
+        Serial.print(" fuelp_x10=");
+        Serial.print(p.fuel_pressure_kpa_x10);
+        Serial.print(" coolant_x10=");
+        Serial.print(p.coolant_temp_c_x10);
+        Serial.print(" lambda_err_x1000=");
+        Serial.println(p.lambda_error_x1000);
     }
 }
 
@@ -156,15 +188,23 @@ static void transmitOnePacket(const TelemetryPacket& packet)
 
         if (state == RADIOLIB_ERR_NONE) {
             txCount++;
-            Serial.print("[LoRa][TX] done count=");
-            Serial.print(txCount);
-            Serial.print(" bytes=");
-            Serial.println(radioPayloadLen);
+            const uint32_t now = millis();
+            if ((uint32_t)(now - lastTxReportMs) >= 1000u) {
+                lastTxReportMs = now;
+                Serial.print("[LoRa][TX] done count=");
+                Serial.print(txCount);
+                Serial.print(" bytes=");
+                Serial.println(radioPayloadLen);
+            }
         } else {
             Serial.print("[LoRa][TX] failed: ");
             Serial.println(state);
         }
 
+        // Give the polled RRU time to read the completed frame and rearm before
+        // another queued packet starts. This also applies to failed transmissions.
+        const TickType_t gapTicks = pdMS_TO_TICKS(LORA_TX_GAP_MS);
+        vTaskDelay(gapTicks > 0 ? gapTicks : 1);
         return;
     }
 }

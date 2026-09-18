@@ -62,7 +62,7 @@ struct __attribute__((packed)) FastPacket {
     uint16_t status_bits;            // raw 0x526; named flags use DBC bit positions
 };
 
-// Bounded supplemental snapshot: the RF budget cannot carry the whole data set at 2 Hz.
+// Supplemental snapshot for measurements outside the high-rate core packet.
 struct __attribute__((packed)) PowertrainPacket {
     uint32_t ms;
     uint16_t seq;

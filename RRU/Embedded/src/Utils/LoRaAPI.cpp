@@ -4,29 +4,23 @@
 #include <string.h>
 #include "PinDefs.h"
 
-#define LORA_FREQ_MHZ           915.0
-#define LORA_BW_KHZ             125.0
-#define LORA_SF                 9
-#define LORA_CR                 7
-#define LORA_TX_POWER_DBM       14
-#define LORA_PREAMBLE_LEN       8
-#define LORA_TCXO_VOLTAGE       1.6
+// Match RTU: 50 Hz core telemetry, with field validation at the 1 km target.
+#define LORA_FREQ_MHZ 915.0
+#define LORA_BW_KHZ 500.0
+#define LORA_SF 6
+#define LORA_CR 5
+#define LORA_TX_POWER_DBM 14
+// LR1121 recommends at least 12 symbols for SF5/SF6.
+#define LORA_PREAMBLE_LEN 12
+#define LORA_TCXO_VOLTAGE 1.6
 
 static SPIClass loraSPI(FSPI);
 
-static LR1121 radio = new Module(
-    LORA_CS,
-    RADIOLIB_NC,     // DIO9/IRQ not routed on PCB
-    LORA_RST,
-    LORA_BUSY,
-    loraSPI
-);
+static LR1121 radio = new Module(LORA_CS,
+                                 RADIOLIB_NC, // DIO9/IRQ not routed on PCB
+                                 LORA_RST, LORA_BUSY, loraSPI);
 
-enum class LoRaApiOp {
-    Idle,
-    Tx,
-    Rx
-};
+enum class LoRaApiOp { Idle, Tx, Rx };
 
 static LoRaApiOp currentOp = LoRaApiOp::Idle;
 
@@ -37,15 +31,9 @@ static uint32_t rxStartMs = 0;
 static uint32_t rxTimeoutMs = 0;
 
 static constexpr uint32_t LORA_IRQ_MASK_ALL =
-    RADIOLIB_LR11X0_IRQ_TX_DONE |
-    RADIOLIB_LR11X0_IRQ_RX_DONE |
-    RADIOLIB_LR11X0_IRQ_PREAMBLE_DETECTED |
-    RADIOLIB_LR11X0_IRQ_SYNC_WORD_HEADER_VALID |
-    RADIOLIB_LR11X0_IRQ_HEADER_ERR |
-    RADIOLIB_LR11X0_IRQ_CRC_ERR |
-    RADIOLIB_LR11X0_IRQ_CAD_DONE |
-    RADIOLIB_LR11X0_IRQ_CAD_DETECTED |
-    RADIOLIB_LR11X0_IRQ_TIMEOUT;
+    RADIOLIB_LR11X0_IRQ_TX_DONE | RADIOLIB_LR11X0_IRQ_RX_DONE | RADIOLIB_LR11X0_IRQ_PREAMBLE_DETECTED |
+    RADIOLIB_LR11X0_IRQ_SYNC_WORD_HEADER_VALID | RADIOLIB_LR11X0_IRQ_HEADER_ERR | RADIOLIB_LR11X0_IRQ_CRC_ERR |
+    RADIOLIB_LR11X0_IRQ_CAD_DONE | RADIOLIB_LR11X0_IRQ_CAD_DETECTED | RADIOLIB_LR11X0_IRQ_TIMEOUT;
 
 static void LoRaApiPrintIrqFlags(uint32_t irq)
 {
@@ -55,24 +43,19 @@ static void LoRaApiPrintIrqFlags(uint32_t irq)
 
 static int16_t LoRaApiConfigureRfSwitch()
 {
-    static const uint32_t rfswitch_dio_pins[] = {
-        RADIOLIB_LR11X0_DIO5,
-        RADIOLIB_LR11X0_DIO6,
-        RADIOLIB_LR11X0_DIO7,
-        RADIOLIB_NC,
-        RADIOLIB_NC
-    };
+    static const uint32_t rfswitch_dio_pins[] = {RADIOLIB_LR11X0_DIO5, RADIOLIB_LR11X0_DIO6, RADIOLIB_LR11X0_DIO7,
+                                                 RADIOLIB_NC, RADIOLIB_NC};
 
     static const Module::RfSwitchMode_t rfswitch_table[] = {
-        { LR11x0::MODE_STBY,  { LOW,  LOW,  LOW,  LOW, LOW } },
-        { LR11x0::MODE_RX,    { LOW,  LOW,  HIGH, LOW, LOW } },
-        { LR11x0::MODE_TX,    { LOW,  HIGH, LOW,  LOW, LOW } },
-        { LR11x0::MODE_TX_HP, { HIGH, LOW,  LOW,  LOW, LOW } },
+        {LR11x0::MODE_STBY, {LOW, LOW, LOW, LOW, LOW}},
+        {LR11x0::MODE_RX, {LOW, LOW, HIGH, LOW, LOW}},
+        {LR11x0::MODE_TX, {LOW, HIGH, LOW, LOW, LOW}},
+        {LR11x0::MODE_TX_HP, {HIGH, LOW, LOW, LOW, LOW}},
 
         // Not used for 915 MHz LoRa.
-        { LR11x0::MODE_TX_HF, { LOW,  LOW,  LOW,  LOW, LOW } },
-        { LR11x0::MODE_GNSS,  { LOW,  LOW,  LOW,  LOW, LOW } },
-        { LR11x0::MODE_WIFI,  { LOW,  LOW,  LOW,  LOW, LOW } },
+        {LR11x0::MODE_TX_HF, {LOW, LOW, LOW, LOW, LOW}},
+        {LR11x0::MODE_GNSS, {LOW, LOW, LOW, LOW, LOW}},
+        {LR11x0::MODE_WIFI, {LOW, LOW, LOW, LOW, LOW}},
 
         END_OF_MODE_TABLE,
     };
@@ -88,16 +71,8 @@ int16_t LoRaApiInit(bool txRole)
 
     loraSPI.begin(SPI_CLK, SPI_MISO, SPI_MOSI, LORA_CS);
 
-    int16_t state = radio.begin(
-        LORA_FREQ_MHZ,
-        LORA_BW_KHZ,
-        LORA_SF,
-        LORA_CR,
-        RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE,
-        LORA_TX_POWER_DBM,
-        LORA_PREAMBLE_LEN,
-        LORA_TCXO_VOLTAGE
-    );
+    int16_t state = radio.begin(LORA_FREQ_MHZ, LORA_BW_KHZ, LORA_SF, LORA_CR, RADIOLIB_LR11X0_LORA_SYNC_WORD_PRIVATE,
+                                LORA_TX_POWER_DBM, LORA_PREAMBLE_LEN, LORA_TCXO_VOLTAGE);
 
     if (state != RADIOLIB_ERR_NONE) {
         return state;
@@ -165,10 +140,7 @@ int16_t LoRaApiStartTransmit(const char* payload)
         return RADIOLIB_ERR_NONE;
     }
 
-    return LoRaApiStartTransmit(
-        reinterpret_cast<const uint8_t*>(payload),
-        strlen(payload)
-    );
+    return LoRaApiStartTransmit(reinterpret_cast<const uint8_t*>(payload), strlen(payload));
 }
 
 int16_t LoRaApiPollTransmit()

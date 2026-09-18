@@ -1,9 +1,8 @@
 # Sender telemetry schema version 2
 
-This document specifies the expanded MAXXECU sender schema and the receiver work
-required next. The Sentio parser, desktop app and LoRa receiver are not updated in
-this change. The existing in-repository LoRa receiver accepts version 1 and will
-reject version 2 until updated.
+This document specifies the expanded MAXXECU sender schema. `RRU/Embedded` accepts
+both version 1 and version 2 and prints packet measurements as CSV. The Sentio
+parser and desktop app still require separate updates for the expanded schema.
 
 The supplied `MAXXECU RAW DBC.dbc` defines MAXXECU layout, signs and scaling. The
 intentional exception is `0x538` bytes 0–1, configured as brake pressure in kPa × 10.
@@ -36,35 +35,39 @@ receiver; their layouts do not describe version 2 sender packets.
 
 ## Cadence and transport budget
 
-The bounded split preserves the existing 500 ms core fast cadence and 2,000 ms
-slow cadence. The added powertrain packet carries the remaining measurements once
-per 6,000 ms. Cut transitions and knock-count increments also appear in event
-packets, so these events do not wait for a powertrain snapshot. This is a transport
-constraint: the expanded data set cannot all be transmitted at 2 Hz with the current
-radio settings. No requested field, including boost solenoid duty, is omitted.
+The core fast packet is generated every 20 ms (50 Hz). Slow packets remain at
+2,000 ms and powertrain packets at 6,000 ms. Cut transitions and knock-count
+increments also appear in event packets, so these events do not wait for a
+powertrain snapshot. No requested field, including boost solenoid duty, is omitted.
 
 | Version 2 packet | Type | Body bytes | Complete frame bytes | Nominal enqueue cadence | Estimated airtime/frame |
 | --- | --- | --- | --- | --- | --- |
-| Fast | 1 | 28 | 35 | 500 ms / 2 Hz | 312.320 ms |
-| Slow | 2 | 32 | 39 | 2,000 ms / 0.5 Hz | 340.992 ms |
-| Event | 3 | 46 | 53 | On qualifying transitions | 427.008 ms |
-| Powertrain | 4 | 58 | 65 | 6,000 ms / 1/6 Hz | 513.024 ms |
+| Fast | 1 | 28 | 35 | 20 ms / 50 Hz | 11.680 ms |
+| Slow | 2 | 32 | 39 | 2,000 ms / 0.5 Hz | 12.320 ms |
+| Event | 3 | 46 | 53 | On qualifying transitions | 15.520 ms |
+| Powertrain | 4 | 58 | 65 | 6,000 ms / 1/6 Hz | 18.080 ms |
 
-Estimates use the configured 915 MHz radio with SF9, 125 kHz bandwidth, coding rate
-4/7, eight preamble symbols, explicit header, PHY CRC enabled and low-data-rate
-optimization disabled. They follow the installed RadioLib airtime calculation:
+Both RTU and RRU use 915 MHz, SF6, 500 kHz bandwidth, coding rate 4/5, 12 preamble
+symbols, private sync word, explicit header, PHY CRC enabled and low-data-rate
+optimization disabled. Transmit power remains 14 dBm. The 12-symbol preamble follows
+the LR1121 recommendation for SF5/SF6. Estimates follow the installed RadioLib
+airtime calculation:
 
 ```text
-airtime_ms = 4.096 * (20.25 + 7 * ceil((8 * complete_frame_bytes + 8) / 36))
+airtime_ms = 0.128 * (26.25 + 5 * ceil((8 * complete_frame_bytes + 12) / 24))
 ```
 
-Version 1 fast/slow/event bodies were 30/46/28 bytes and complete frames were
-37/53/35 bytes. Existing periodic traffic required about 895.488 ms of airtime per
-second (89.5488%). The split version 2 periodic traffic requires about 880.640 ms
-per second (88.064%), excluding events and software/radio setup overhead. Its
-periodic wire rate is approximately 100.333 bytes/s versus 100.5 bytes/s before.
-A single expanded 83-byte fast frame at 2 Hz plus the new slow frame would require
-142.592% airtime and cannot sustain that cadence.
+Periodic traffic consumes approximately 593.173 ms of RF airtime per second
+(59.317%). A 3 ms gap after each completed transmission gives the polled receiver
+time to rearm when packets are queued back to back. Together, airtime and these
+gaps consume about 74.517% of a second, excluding polling, setup, USB output and
+events. Periodic wire traffic is approximately 1,780.333 bytes/s. Successful TX
+diagnostics are limited to one report per second; errors are still reported.
+
+The previous SF9 / 125 kHz / 4/7 / eight-symbol profile took 312.320 ms per FAST
+packet and supported the earlier 2 Hz split, not 50 Hz. **Both boards must run the
+new radio settings together**; schema compatibility alone does not make old radio
+settings interoperable. Packet layouts and the 75-column receiver CSV are unchanged.
 
 The fixed application radio buffer remains 96 bytes, leaving 89 bytes for a body.
 The largest version 2 frame is 65 bytes. The shared queue still contains 24 entries,
@@ -73,13 +76,31 @@ full. A queue item is now 59 bytes, so item storage rises from 1,128 to 1,416 by
 (288 additional bytes, excluding FreeRTOS queue bookkeeping). No retransmission,
 priority queue or packet coalescing is added.
 
-The cadence describes packet generation while decoded CAN traffic is arriving,
-not exact RF departure times. A powertrain transmission alone lasts longer than
-500 ms; coincident packets can queue and depart later. Nominal unused airtime is
-119.360 ms/s before overhead, approximately one additional 427.008 ms event every
-3.58 seconds on average. Sustained event bursts can fill the bounded queue and
-cause the existing drop-newest behavior. These are airtime estimates, not measured
-RF performance or a guarantee against packet loss.
+Scheduling starts after the first successfully decoded CAN frame. Bounded CAN
+receive waits let periodic deadlines run even without another valid frame. Deadlines
+retain their phase; if execution is late, one current snapshot is sent and missed
+slots are skipped rather than replayed. After CAN stops, snapshots continue with
+cached measurements and aging freshness masks. A 50 Hz snapshot rate does not
+prove every ECU signal updates at 50 Hz; source CAN rates still determine that.
+
+The receiver emits one row per received packet, nominally 50 FAST rows/s plus
+0.5 SLOW rows/s, 1/6 POWERTRAIN rows/s and events. It polls every RTOS tick (1 ms
+in this build), captures packet metadata, then rearms before formatting and printing
+CSV. Coincident packets, events, RTOS scheduling, serial backpressure and losses
+cause arrival jitter; rows are not guaranteed exactly 20 ms apart. Sustained event
+bursts can fill the bounded FIFO and cause drop-newest behavior. There is no
+receiver timer duplicating old rows to manufacture a 50 Hz output rate.
+
+The design target is 1 km. Clear line-of-sight operation is plausible, but no range
+or sustained-rate measurement has been made on these boards. Higher bandwidth and
+lower spreading factor trade sensitivity for throughput; antenna placement, vehicle
+shielding, obstructions and fading determine the actual margin. See the
+[Semtech LR1121 user manual, section 8.2.2.1](https://storage.googleapis.com/cloud-storage-web/public/t_form3/rzsyE6ulSlqjnJrpxSmZqD5It5wRyeCyyxP6I2Y3.pdf)
+for preamble settings and [Semtech's link-budget explanation](https://blog.semtech.com/long-range-with-lora)
+for the sensitivity tradeoff. Validate at the actual course with both boards:
+count FAST arrivals over sustained windows, check sequence gaps and `tx_ms`
+spacing, inspect RSSI/SNR across the full 1 km, and include expected event traffic.
+These are calculated budgets, not a guarantee against packet loss.
 
 ## Common body header and validity
 
@@ -124,9 +145,10 @@ without saturation. The signed 32-bit representation covers the complete DBC
 input range. Do not infer validity from the error's numeric value alone.
 
 Freshness describes the snapshot at `ms`. The receiver must additionally monitor
-packet arrival age: the CAN task retains its receive-driven cadence and can stop
-publishing when CAN traffic stops entirely. It must not indefinitely display the
-last packet's `fresh_mask` as proof that data remains live. A 6-second powertrain
+packet arrival age, including radio loss or a sender that has stopped. CAN silence
+now produces cached snapshots whose freshness bits clear after 2,000 ms. It must
+not indefinitely display the last packet's `fresh_mask` as proof that data remains
+live. A 6-second powertrain
 period also means a fresh-at-snapshot value can age before the next snapshot.
 Queueing and transmission can add delay before arrival; do not label the receive
 time as the acquisition time. The protocol carries sender uptime, not a

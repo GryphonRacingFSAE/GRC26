@@ -8,20 +8,21 @@
 // -----------------------------
 // Telemetry rate configuration
 // -----------------------------
-// Conservative for 915 MHz LoRa range/reliability.
-#define TELEMETRY_FAST_PERIOD_MS 500u  // 2 Hz
+// FAST requires the matching 500 kHz / SF6 / 4/5 profile on both radios.
+#define TELEMETRY_FAST_PERIOD_MS 20u   // 50 Hz
 #define TELEMETRY_SLOW_PERIOD_MS 2000u // 0.5 Hz
 
 // -----------------------------
 // CAN/TWAI configuration
 // -----------------------------
-#define CAN_TASK_PERIOD_MS 20u // Used only for idle delays / status pacing
+#define CAN_TASK_PERIOD_MS 20u // Error backoff; normal receive waits follow telemetry deadlines.
 
 // -----------------------------
 // LoRa task configuration
 // -----------------------------
 #define LORA_RX_TIMEOUT_MS 5000u
 #define LORA_TX_POLL_DELAY_MS 2u
+#define LORA_TX_GAP_MS 3u // Allow the receiver to finish reading and rearm between queued transmissions.
 
 // Set to 1 on the car/transmitter board and 0 on the pit/receiver board.
 #ifndef LORA_ROLE_TX

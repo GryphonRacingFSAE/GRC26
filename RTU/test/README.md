@@ -12,7 +12,7 @@ and UndefinedBehaviorSanitizer when that compiler provides the runtimes. The tes
 Windows MinGW 6.3 installation uses operating-system guard pages without requiring
 sanitizers. Build artifacts go only in `.pio/native-tests/`.
 
-The runner builds and executes two independent programs with warnings treated as
+The runner builds and executes four independent programs with warnings treated as
 errors:
 
 - `native/`: all 14 supported CAN IDs, independent DBC byte expectations and
@@ -20,7 +20,8 @@ errors:
   exact signed 32-bit lambda error, every raw status bit and its named booleans,
   vehicle-speed regression, per-source receipt/freshness, and timer rollover.
 - `test_can_task.cpp`: the actual sender CAN task with small Arduino/TWAI/queue
-  substitutes. Checks the 500/2000/6000 ms periods, timer rollover, sequence numbers,
+  substitutes. Checks the 20/2000/6000 ms periods, telemetry during CAN silence,
+  receive timeouts following the next telemetry deadline, timer rollover, sequence numbers,
   nonblocking drop-newest behavior, dropped-event baselines, driver setup/failure,
   and decoded vehicle speed reaching the queued fast packet. No CAN-transmit API
   is supplied by the substitutes.
@@ -45,3 +46,13 @@ timing still require hardware.
 
 No pre-existing sender tests were found. The Windows run used guard pages; the
 optional sanitizer mode was not run.
+
+The runner also compiles `test_lora_tx_task.cpp` twice, selecting TX and legacy RX
+roles. This includes the actual LoRa task and production serializer. Its dedicated
+`tx_integration_stubs/` substitutes only the radio, serial, queue, and clock
+boundaries. Checks cover all four V2 frame envelopes, one send per queue entry,
+busy polling, the 3 ms completion guard (including failed transmissions and
+back-to-back queue entries), minimum one tick at coarse RTOS tick rates, immediate
+error reporting, success-log throttling across millisecond rollover, task startup,
+initialization failure, and a legacy V1 receive smoke test. These checks model
+scheduling logic; they do not measure actual SPI, serial, or RF timing.

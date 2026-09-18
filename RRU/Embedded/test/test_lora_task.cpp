@@ -29,6 +29,9 @@ bool stopAfterLoopDelay = false;
 uint32_t lastTimeoutMs = 0;
 std::vector<uint32_t> delays;
 std::vector<uint8_t> radioBytes;
+std::vector<std::string> operations;
+float radioRssi = -92.25f;
+float radioSnr = 7.5f;
 unsigned checks = 0;
 unsigned groups = 0;
 
@@ -45,13 +48,19 @@ void check(bool condition, const char* expression, int line)
 
 uint32_t millis()
 {
+    operations.emplace_back("millis");
     return clockMs;
+}
+
+void testSerialPrinted()
+{
+    operations.emplace_back("print");
 }
 
 void vTaskDelay(uint32_t ticks)
 {
     delays.push_back(ticks);
-    if (stopAfterLoopDelay && ticks == 5) {
+    if (stopAfterLoopDelay && ticks == 1) {
         throw StopTask{};
     }
 }
@@ -65,13 +74,21 @@ int16_t LoRaApiInit(bool txRole)
 
 int16_t LoRaApiStartReceive(uint32_t timeoutMs)
 {
+    operations.emplace_back("start");
     ++startCalls;
     lastTimeoutMs = timeoutMs;
+    if (startCalls > 1) {
+        // Model metadata changing as soon as the radio enters its next receive.
+        radioRssi = -120.0f;
+        radioSnr = -3.0f;
+        clockMs += 17;
+    }
     return startResult;
 }
 
 int16_t LoRaApiPollReceive(uint8_t* buffer, size_t bufferSize, size_t* receivedLen)
 {
+    operations.emplace_back("poll");
     ++pollCalls;
     CHECK(buffer != nullptr);
     CHECK(receivedLen != nullptr);
@@ -87,11 +104,13 @@ int16_t LoRaApiPollReceive(uint8_t* buffer, size_t bufferSize, size_t* receivedL
 
 float LoRaApiGetRSSI()
 {
-    return -92.25f;
+    operations.emplace_back("rssi");
+    return radioRssi;
 }
 float LoRaApiGetSNR()
 {
-    return 7.5f;
+    operations.emplace_back("snr");
+    return radioSnr;
 }
 
 #include "../src/Tasks/LoRa.cpp"
@@ -108,6 +127,9 @@ void reset()
     Serial.lines.clear();
     delays.clear();
     radioBytes.clear();
+    operations.clear();
+    radioRssi = -92.25f;
+    radioSnr = 7.5f;
     initCalls = startCalls = pollCalls = 0;
     initResult = startResult = pollResult = RADIOLIB_ERR_NONE;
     lastInitWasTx = true;
@@ -196,7 +218,14 @@ void receive()
     LoRaRxTaskPoll();
     CHECK(rxActive);
     CHECK(lastTimeoutMs == LORA_RX_TIMEOUT_MS);
+    operations.clear();
     LoRaRxTaskPoll();
+}
+
+void checkPacketOperationOrder()
+{
+    const std::vector<std::string> expected{"poll", "rssi", "snr", "millis", "start", "print"};
+    CHECK(operations == expected);
 }
 
 void testPowertrain()
@@ -204,7 +233,9 @@ void testPowertrain()
     reset();
     radioBytes = powertrainFrame();
     receive();
-    CHECK(!rxActive);
+    CHECK(rxActive);
+    CHECK(startCalls == 2);
+    checkPacketOperationOrder();
     CHECK(rxPacketCount == 1);
     CHECK(Serial.lines.size() == 1);
     const auto values = row(Serial.lines.front());
@@ -243,6 +274,8 @@ void testLegacy()
     put16(body, 28, 0x0012);
     radioBytes = frame(1, 1, body);
     receive();
+    CHECK(rxActive);
+    checkPacketOperationOrder();
     CHECK(Serial.lines.size() == 1);
     const auto values = row(Serial.lines.front());
     CHECK(values.at("event") == "rx_packet");
@@ -264,7 +297,8 @@ void testInvalidCrc()
     radioBytes = powertrainFrame();
     radioBytes.back() ^= 0x40;
     receive();
-    CHECK(!rxActive);
+    CHECK(rxActive);
+    checkPacketOperationOrder();
     CHECK(rxPacketCount == 1); // Count denotes completed RF reads, including bad application CRC.
     CHECK(Serial.lines.size() == 1);
     const auto values = row(Serial.lines.front());
@@ -287,20 +321,26 @@ void testBusyTimeoutAndRearm()
     LoRaRxTaskPoll();
     CHECK(rxActive);
     pollResult = LORA_API_BUSY;
+    operations.clear();
     LoRaRxTaskPoll();
     CHECK(rxActive);
     CHECK(rxPacketCount == 0);
     CHECK(startCalls == 2);
     CHECK(Serial.lines.empty());
+    CHECK(operations == std::vector<std::string>{"poll"});
     pollResult = RADIOLIB_ERR_RX_TIMEOUT;
-    LoRaRxTaskPoll();
-    CHECK(!rxActive);
-    CHECK(rxPacketCount == 0);
-    CHECK(Serial.lines.empty());
+    operations.clear();
     LoRaRxTaskPoll();
     CHECK(rxActive);
+    CHECK(rxPacketCount == 0);
+    CHECK(Serial.lines.empty());
     CHECK(startCalls == 3);
     CHECK(pollCalls == 2);
+    CHECK(operations == (std::vector<std::string>{"poll", "start"}));
+    pollResult = LORA_API_BUSY;
+    LoRaRxTaskPoll();
+    CHECK(startCalls == 3);
+    CHECK(pollCalls == 3);
     CHECK(delays.empty());
     ++groups;
 }
@@ -311,7 +351,8 @@ void testRadioErrors()
         reset();
         pollResult = state;
         receive();
-        CHECK(!rxActive);
+        CHECK(rxActive);
+        checkPacketOperationOrder();
         CHECK(rxPacketCount == 0);
         CHECK(Serial.lines.size() == 1);
         const auto values = row(Serial.lines.front());
@@ -320,6 +361,7 @@ void testRadioErrors()
         CHECK(values.at("error_text") ==
               (state == RADIOLIB_ERR_CRC_MISMATCH ? "radio_crc_or_header_mismatch" : "receive_failed"));
         CHECK(values.at("schema_version").empty());
+        pollResult = LORA_API_BUSY;
         LoRaRxTaskPoll();
         CHECK(rxActive);
     }
@@ -367,11 +409,87 @@ void testTaskInitializationAndHeader()
     CHECK(rxActive);
     CHECK(lastTimeoutMs == 5000);
     CHECK(delays.size() == 1);
-    CHECK(delays.front() == 5);
+    CHECK(delays.front() == 1);
     CHECK(Serial.lines.size() == 1);
     CHECK(Serial.lines.front() == telemetryCsvHeader());
     printCsvHeaderOnce();
     CHECK(Serial.lines.size() == 1);
+    ++groups;
+}
+
+void testRearmFailureRetainsCompletedPacket()
+{
+    for (int16_t nextStart : {static_cast<int16_t>(-12), LORA_API_BUSY}) {
+        reset();
+        radioBytes = powertrainFrame();
+        LoRaRxTaskPoll();
+        CHECK(rxActive);
+        startResult = nextStart;
+        operations.clear();
+        LoRaRxTaskPoll();
+        CHECK(!rxActive);
+        CHECK(rxPacketCount == 1);
+        CHECK(startCalls == 2);
+        CHECK(Serial.lines.size() == (nextStart == LORA_API_BUSY ? 1u : 2u));
+        const auto packet = row(Serial.lines.front());
+        CHECK(packet.at("event") == "rx_packet");
+        CHECK(packet.at("rx_ms") == "987654");
+        CHECK(packet.at("rssi_dbm") == "-92.25");
+        CHECK(packet.at("snr_db") == "7.50");
+        CHECK(std::find(operations.begin(), operations.end(), "start") <
+              std::find(operations.begin(), operations.end(), "print"));
+        if (nextStart == LORA_API_BUSY) {
+            CHECK(delays.empty());
+        } else {
+            CHECK(delays == std::vector<uint32_t>{100});
+            const auto error = row(Serial.lines.back());
+            CHECK(error.at("event") == "rx_error");
+            CHECK(error.at("error_text") == "start_receive_failed");
+            CHECK(error.at("error_code") == "-12");
+        }
+        const size_t lineCount = Serial.lines.size();
+        startResult = RADIOLIB_ERR_NONE;
+        LoRaRxTaskPoll();
+        CHECK(rxActive);
+        CHECK(startCalls == 3);
+        CHECK(Serial.lines.size() == lineCount);
+        CHECK(rxPacketCount == 1);
+    }
+    ++groups;
+}
+
+void testConsecutiveFastPackets()
+{
+    reset();
+    LoRaRxTaskPoll();
+    CHECK(rxActive);
+    for (unsigned index = 0; index < 50; ++index) {
+        std::vector<uint8_t> body(28, 0);
+        put32(body, 0, index * 20);
+        put16(body, 4, static_cast<uint16_t>(index));
+        put16(body, 6, 0x3FFF);
+        put16(body, 8, 0x3FFF);
+        put16(body, 10, static_cast<uint16_t>(7000 + index));
+        radioBytes = frame(2, 1, body);
+        clockMs = 1000 + index * 20;
+        radioRssi = -92.25f;
+        radioSnr = 7.5f;
+        operations.clear();
+        LoRaRxTaskPoll();
+        checkPacketOperationOrder();
+        CHECK(rxActive);
+        CHECK(startCalls == index + 2);
+        CHECK(rxPacketCount == index + 1);
+        CHECK(Serial.lines.size() == index + 1);
+        const auto values = row(Serial.lines.back());
+        CHECK(values.at("event") == "rx_packet");
+        CHECK(values.at("packet_type") == "FAST");
+        CHECK(values.at("seq") == std::to_string(index));
+        CHECK(values.at("rpm") == std::to_string(7000 + index));
+        CHECK(values.at("tx_ms") == std::to_string(index * 20));
+        CHECK(values.at("rx_ms") == std::to_string(1000 + index * 20));
+    }
+    CHECK(delays.empty());
     ++groups;
 }
 
@@ -386,6 +504,8 @@ int main()
     testRadioErrors();
     testStartFailureBackoff();
     testTaskInitializationAndHeader();
+    testRearmFailureRetainsCompletedPacket();
+    testConsecutiveFastPackets();
     std::printf("LoRa task integration: %u checks in %u groups passed.\n", checks, groups);
     return 0;
 }
