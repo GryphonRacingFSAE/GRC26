@@ -5,11 +5,12 @@
 #include "LoRa.h"
 #include "AssertMsg.h"
 #include "LoRaAPI.h"
+#include "TelemetrySender.h"
 
 static constexpr uint8_t TELEMETRY_MAGIC_0 = 'T';
 static constexpr uint8_t TELEMETRY_MAGIC_1 = 'M';
-static constexpr uint8_t TELEMETRY_VERSION = 1;
-static constexpr size_t  TELEMETRY_MAX_RADIO_PAYLOAD = 96;
+static constexpr uint8_t TELEMETRY_VERSION = 1; // Legacy RX; TX uses TelemetryV2::VERSION.
+static constexpr size_t TELEMETRY_MAX_RADIO_PAYLOAD = 96;
 
 static uint32_t txCount = 0;
 static uint32_t rxCount = 0;
@@ -31,72 +32,6 @@ static uint16_t crc16_ccitt(const uint8_t* data, size_t len)
     }
 
     return crc;
-}
-
-static const void* getPacketPayloadPtr(const TelemetryPacket& packet, size_t* len)
-{
-    if (len == nullptr) {
-        return nullptr;
-    }
-
-    switch (packet.type) {
-        case TELEMETRY_PACKET_FAST:
-            *len = sizeof(TelemetryFastPacket);
-            return &packet.data.fast;
-
-        case TELEMETRY_PACKET_SLOW:
-            *len = sizeof(TelemetrySlowPacket);
-            return &packet.data.slow;
-
-        case TELEMETRY_PACKET_EVENT:
-            *len = sizeof(TelemetryEventPacket);
-            return &packet.data.event;
-
-        default:
-            *len = 0;
-            return nullptr;
-    }
-}
-
-static bool buildRadioPayload(const TelemetryPacket& packet, uint8_t* out, size_t outSize, size_t* outLen)
-{
-    if (out == nullptr || outLen == nullptr) {
-        return false;
-    }
-
-    *outLen = 0;
-
-    size_t payloadLen = 0;
-    const void* payloadPtr = getPacketPayloadPtr(packet, &payloadLen);
-
-    if (payloadPtr == nullptr || payloadLen == 0) {
-        return false;
-    }
-
-    // Header: magic[2], version[1], type[1], payload length[1]
-    // Footer: CRC16 over header + payload
-    const size_t headerLen = 5;
-    const size_t crcLen = 2;
-    const size_t totalLen = headerLen + payloadLen + crcLen;
-
-    if (payloadLen > 255 || totalLen > outSize) {
-        return false;
-    }
-
-    out[0] = TELEMETRY_MAGIC_0;
-    out[1] = TELEMETRY_MAGIC_1;
-    out[2] = TELEMETRY_VERSION;
-    out[3] = packet.type;
-    out[4] = (uint8_t)payloadLen;
-
-    memcpy(&out[headerLen], payloadPtr, payloadLen);
-
-    const uint16_t crc = crc16_ccitt(out, headerLen + payloadLen);
-    out[headerLen + payloadLen] = (uint8_t)(crc & 0xFF);
-    out[headerLen + payloadLen + 1] = (uint8_t)((crc >> 8) & 0xFF);
-
-    *outLen = totalLen;
-    return true;
 }
 
 static bool validateRadioPayload(const uint8_t* data, size_t len, uint8_t* packetType, const uint8_t** payload, size_t* payloadLen)
@@ -195,10 +130,10 @@ static void printPacketSummary(uint8_t type, const uint8_t* payload, size_t payl
 
 static void transmitOnePacket(const TelemetryPacket& packet)
 {
-    uint8_t radioPayload[TELEMETRY_MAX_RADIO_PAYLOAD] = {0};
+    uint8_t radioPayload[TelemetryV2::MAX_RADIO_PAYLOAD] = {0};
     size_t radioPayloadLen = 0;
 
-    if (!buildRadioPayload(packet, radioPayload, sizeof(radioPayload), &radioPayloadLen)) {
+    if (!buildTelemetryRadioPayload(packet, radioPayload, sizeof(radioPayload), &radioPayloadLen)) {
         Serial.println("[LoRa][TX] Failed to build radio payload");
         return;
     }
