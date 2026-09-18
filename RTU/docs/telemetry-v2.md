@@ -9,6 +9,38 @@ intentional exception is `0x538` bytes 0–1, configured as brake pressure in kP
 The existing `0x600` IMU mapping remains signed X/Y/Z acceleration in milligravity.
 No ECU configuration is changed and the acquisition task does not send CAN frames.
 
+## Over-the-air bench test
+
+In `include/Utils/Telemetry.h`, set `TELEMETRY_MOCK_DATA` to `1` before building
+and flashing the RTU transmitter. Leave `LORA_ROLE_TX` set to `1`. The default
+`TELEMETRY_MOCK_DATA 0` uses real CAN input; restore it to `0` and reflash before
+testing with the car. The define can also be supplied as `-DTELEMETRY_MOCK_DATA=1`
+in PlatformIO `build_flags` (a build flag overrides the header default).
+
+```powershell
+pio run -e esp32-s3-devboard -t upload
+pio device monitor -b 115200
+```
+
+With mock mode enabled, CAN is not initialized or read and no ECU connection is
+needed. Serial prints `[CAN][MOCK] Enabled: generated telemetry -> LoRa; CAN disabled`
+at startup. The real LoRa task transmits generated data using the same V2 packets,
+fixed-point units, sequence numbers, CRC, queue, radio settings, and packet rates
+as real input. Use the normal V2-capable RRU receiver with matching radio settings;
+the legacy V1 RX path in this RTU project cannot decode these packets.
+
+All 14 supported ECU/IMU sources are generated through the normal decoder and
+remain fresh (`received_mask` and `fresh_mask` are `0x3FFF`). Values change once
+per second: RPM ramps from 1,000 to 6,900 in steps of 100, while vehicle speed
+ramps from 0 to 59 km/h in steps of 1. Both repeat every 60 seconds of uptime.
+Temperatures, pressures, throttle, gear, and acceleration also vary. Brake/cut
+states toggle and the knock counter increments every 5 seconds; error and lost-sync
+counters increment every 10 and 15 seconds. These exercise event packets as well
+as fast (20 ms), slow (2 seconds), and powertrain (6 seconds) packets.
+
+Mock frames deliberately have no special wire marker: the receiver handles them
+exactly like real telemetry. The startup message identifies the selected mode.
+
 ## Packet envelope and compatibility
 
 Every radio frame has the same framing and CRC algorithm as version 1:

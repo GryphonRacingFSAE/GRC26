@@ -29,6 +29,18 @@
 #define LORA_ROLE_TX 1
 #endif
 
+// Bench test: 1 sends generated ECU data over the real LoRa radio without CAN.
+// Set back to 0 before using real vehicle data. May also be set with -D at build time.
+#ifndef TELEMETRY_MOCK_DATA
+#define TELEMETRY_MOCK_DATA 1
+#endif
+#if TELEMETRY_MOCK_DATA != 0 && TELEMETRY_MOCK_DATA != 1
+#error "TELEMETRY_MOCK_DATA must be 0 or 1"
+#endif
+#if TELEMETRY_MOCK_DATA && !LORA_ROLE_TX
+#error "Mock telemetry requires LORA_ROLE_TX=1"
+#endif
+
 enum TelemetryPacketType : uint8_t {
     TELEMETRY_PACKET_FAST = 1,
     TELEMETRY_PACKET_SLOW = 2,

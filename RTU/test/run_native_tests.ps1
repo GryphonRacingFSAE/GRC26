@@ -11,6 +11,7 @@ $testExecutable = Join-Path $buildDirectory 'sender_tests.exe'
 $compilerCommand = Get-Command $Compiler -ErrorAction Stop
 $compileArguments = @(
     '-std=c++11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O1', '-g',
+    '-DTELEMETRY_MOCK_DATA=0',
     '-I', (Join-Path $repoRoot 'include/Utils'),
     (Join-Path $PSScriptRoot 'native/test_main.cpp'),
     (Join-Path $PSScriptRoot 'native/test_decoder.cpp'),
@@ -35,6 +36,7 @@ if ($LASTEXITCODE -ne 0) {
 $integrationExecutable = Join-Path $buildDirectory 'can_task_tests.exe'
 $integrationArguments = @(
     '-std=c++11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O1', '-g',
+    '-DTELEMETRY_MOCK_DATA=0',
     '-I', (Join-Path $PSScriptRoot 'integration_stubs'),
     '-I', (Join-Path $repoRoot 'include/Utils'),
     (Join-Path $PSScriptRoot 'test_can_task.cpp'),
@@ -54,10 +56,35 @@ if ($LASTEXITCODE -ne 0) {
     throw "CAN task integration tests failed with exit code $LASTEXITCODE"
 }
 
+$mockExecutable = Join-Path $buildDirectory 'mock_can_task_tests.exe'
+$mockArguments = @(
+    '-std=c++11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O1', '-g',
+    '-DTELEMETRY_MOCK_DATA=1',
+    '-I', (Join-Path $PSScriptRoot 'integration_stubs'),
+    '-I', (Join-Path $repoRoot 'include/Utils'),
+    (Join-Path $PSScriptRoot 'test_mock_can_task.cpp'),
+    (Join-Path $repoRoot 'src/Utils/EcuTelemetry.cpp'),
+    (Join-Path $repoRoot 'src/Utils/TelemetrySender.cpp'),
+    (Join-Path $repoRoot 'src/Utils/MockTelemetry.cpp'),
+    '-o', $mockExecutable
+)
+if ($Sanitize) {
+    $mockArguments += @('-fsanitize=address,undefined', '-fno-omit-frame-pointer')
+}
+& $compilerCommand.Source @mockArguments
+if ($LASTEXITCODE -ne 0) {
+    throw "Mock CAN task integration test compilation failed with exit code $LASTEXITCODE"
+}
+& $mockExecutable
+if ($LASTEXITCODE -ne 0) {
+    throw "Mock CAN task integration tests failed with exit code $LASTEXITCODE"
+}
+
 foreach ($role in @(1, 0)) {
     $txExecutable = Join-Path $buildDirectory "lora_task_role_$role.exe"
     $txArguments = @(
         '-std=c++11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O1', '-g',
+        '-DTELEMETRY_MOCK_DATA=0',
         "-DLORA_ROLE_TX=$role",
         '-I', (Join-Path $PSScriptRoot 'tx_integration_stubs'),
         '-I', (Join-Path $repoRoot 'include/Utils'),

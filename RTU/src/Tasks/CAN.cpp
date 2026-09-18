@@ -1,15 +1,20 @@
 #include <Arduino.h>
-#include <PinDefs.h>
-#include "driver/twai.h"
 
 #include "CANTask.h"
 #include "TelemetrySender.h"
+
+#if TELEMETRY_MOCK_DATA
+#include "MockTelemetry.h"
+#else
+#include <PinDefs.h>
+#include "driver/twai.h"
 
 // Receive only: retain existing bus timing/mode and never enqueue CAN transmissions.
 static twai_general_config_t g_config =
     TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_TX, (gpio_num_t)CAN_RX, TWAI_MODE_NORMAL);
 static twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
 static twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+#endif
 
 static EcuTelemetryState ecu = {};
 static TelemetryEventTracker eventTracker = {};
@@ -18,6 +23,7 @@ static uint32_t lastFastTxMs = 0;
 static uint32_t lastSlowTxMs = 0;
 static uint32_t lastPowertrainTxMs = 0;
 
+#if !TELEMETRY_MOCK_DATA
 static bool initCAN()
 {
     f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
@@ -45,6 +51,7 @@ static bool decodeCanData(const twai_message_t* msg)
     return msg != nullptr &&
            decodeEcuCanFrame(ecu, msg->identifier, msg->data, msg->data_length_code, millis(), msg->extd, msg->rtr);
 }
+#endif
 
 static bool sendTelemetryPacket(QueueHandle_t queue, const TelemetryPacket& packet)
 {
@@ -149,6 +156,16 @@ void CANTask(void* pvParameters)
     QueueHandle_t telemetryQueue = params->dataQueue;
     Serial.println("[CAN] Task started");
 
+#if TELEMETRY_MOCK_DATA
+    Serial.println("[CAN][MOCK] Enabled: generated telemetry -> LoRa; CAN disabled");
+    for (;;) {
+        updateMockTelemetry(ecu, millis());
+        sendPeriodicPacketsIfDue(telemetryQueue);
+        sendEventPacketIfNeeded(telemetryQueue);
+        const TickType_t waitTicks = telemetryReceiveWaitTicks();
+        vTaskDelay(waitTicks > 0 ? waitTicks : 1);
+    }
+#else
     if (!initCAN()) {
         Serial.println("[CAN] Init failed; deleting task");
         vTaskDelete(nullptr);
@@ -170,4 +187,5 @@ void CANTask(void* pvParameters)
             vTaskDelay(pdMS_TO_TICKS(CAN_TASK_PERIOD_MS));
         }
     }
+#endif
 }

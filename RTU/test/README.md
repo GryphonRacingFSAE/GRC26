@@ -12,7 +12,7 @@ and UndefinedBehaviorSanitizer when that compiler provides the runtimes. The tes
 Windows MinGW 6.3 installation uses operating-system guard pages without requiring
 sanitizers. Build artifacts go only in `.pio/native-tests/`.
 
-The runner builds and executes four independent programs with warnings treated as
+The runner builds and executes five independent programs with warnings treated as
 errors:
 
 - `native/`: all 14 supported CAN IDs, independent DBC byte expectations and
@@ -25,6 +25,15 @@ errors:
   nonblocking drop-newest behavior, dropped-event baselines, driver setup/failure,
   and decoded vehicle speed reaching the queued fast packet. No CAN-transmit API
   is supplied by the substitutes.
+- `test_mock_can_task.cpp`: runs the actual task with `TELEMETRY_MOCK_DATA=1` for
+  60 simulated seconds. Checks that no CAN driver operation occurs, all fourteen
+  sources stay fresh, fast/slow/powertrain packets keep their 20/2000/6000 ms
+  cadence, RPM and speed change and repeat after a minute, status/counter changes
+  generate events, and queued packets have sequential numbers and valid V2
+  envelopes/CRCs. The task feeds a host queue; this test does not emit radio traffic.
+
+The runner explicitly selects mock mode for that test and real CAN mode for all
+other tests, regardless of the default in `include/Utils/Telemetry.h`.
 
 Decoder cases place each payload immediately before an inaccessible memory page.
 Every DLC from zero through seven must be rejected without reading past its actual
