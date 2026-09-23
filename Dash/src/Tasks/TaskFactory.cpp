@@ -7,6 +7,7 @@
 // Static Handles (Private)
 static SemaphoreHandle_t guiMutexHandle;
 static QueueHandle_t     dataQueueHandle;
+static QueueHandle_t     periphQueueHandle;
 
 static TaskHandle_t guiTaskHandle = NULL;
 static TaskHandle_t dataTaskHandle = NULL;
@@ -22,14 +23,16 @@ void createTasks() {
     // 1. Objects
     guiMutexHandle = xSemaphoreCreateMutex();
     dataQueueHandle = xQueueCreate(10, sizeof(EcuData_t)); // Update sizeof() later
+    periphQueueHandle = xQueueCreate(10, sizeof(EcuData_t));
 
     // 2. Params
     guiParams.guiMutex = &guiMutexHandle;
     guiParams.dataQueue = &dataQueueHandle;
     
     dataParams.dataQueue = &dataQueueHandle;
+    dataParams.peripheralQueue = &periphQueueHandle;
     
-    periphParams.guiMutex = &guiMutexHandle;
+    periphParams.peripheralQueue = &periphQueueHandle;
 
     // 3. Tasks
     // GUI on Core 1 (App Core) is best for Rendering

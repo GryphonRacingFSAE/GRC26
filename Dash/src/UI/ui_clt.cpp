@@ -8,7 +8,8 @@
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
 static constexpr int8_t marginX = 50;
-static constexpr int8_t marginY = 50;
+static constexpr int8_t marginY = 25;
+static constexpr int8_t CAPTION_GAP = 4;
 
 static lv_obj_t* coolantTemp_label = nullptr;
 static lv_obj_t* coolantTemp_ui = nullptr; 
@@ -17,17 +18,17 @@ void ui_clt_init() {
     coolantTemp_label = lv_label_create(lv_scr_act());
     coolantTemp_ui = lv_label_create(lv_scr_act());
 
-    lv_label_set_text(coolantTemp_label, "0°C");
+    lv_label_set_text(coolantTemp_label, "0");
     lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
     lv_obj_align(coolantTemp_label, LV_ALIGN_TOP_LEFT, marginX, marginY);  
 
     lv_obj_update_layout(coolantTemp_label);
 
-    lv_label_set_text(coolantTemp_ui, "CLT");
+    lv_label_set_text(coolantTemp_ui, "CLT °C");
     lv_obj_set_style_text_font(coolantTemp_ui, &lv_font_montserrat_36, 0);
     lv_obj_set_style_text_color(coolantTemp_ui, lv_color_white(), 0);
-    lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, 0, marginY/2);
+    lv_obj_align_to(coolantTemp_ui, coolantTemp_label, LV_ALIGN_OUT_BOTTOM_MID, 0, CAPTION_GAP);
 }
 
 void ui_clt_update(const EcuData_t* data) {

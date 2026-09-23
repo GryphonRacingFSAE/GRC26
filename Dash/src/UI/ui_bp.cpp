@@ -9,7 +9,7 @@ static constexpr int16_t METER_W = 100;
 static constexpr int16_t METER_H = 400;
 static constexpr int16_t METER_RIGHT_X = 100;   
 static constexpr int16_t METER_SPACING = 50;
-static constexpr float BRAKE_PRES_MAX = 100.0f; // did not confirm actual max
+static constexpr float BRAKE_PRES_MAX = 2000.0f;
  
 static lv_obj_t* brake_bar   = nullptr;
 static lv_obj_t* brake_label = nullptr;
@@ -62,11 +62,9 @@ void ui_bp_update(const EcuData_t* data) {
     pct = (pct > 100) ? 100 : (pct < 0) ? 0 : pct;
  
     lv_bar_set_value(brake_bar, pct, LV_ANIM_OFF);
-    lv_label_set_text_fmt(brake_label, "%d", data->bp);
+    lv_label_set_text_fmt(brake_label, "%d", pct);
  
-    lv_color_t col = (pct < 30) ? lv_color_hex(0x2979FF)   // blue
-                   : (pct < 70) ? lv_color_hex(0xAA00FF)   // purple
-                   :              lv_color_hex(0xFF1744);  // red
+    lv_color_t col = (pct < 30) ? lv_color_hex(0x2979FF) : (pct < 70) ? lv_color_hex(0xAA00FF) : lv_color_hex(0xFF1744);  
     set_bar_color(brake_bar, col);
 
     bp_prev = data->bp;
