@@ -1,5 +1,6 @@
 #include <CANTask.h>
 #include <DataAcqTask.h>
+#include <CANFramePack.h>
 #include <Arduino.h>
 #include <PinDefs.h>
 #include <string.h>
@@ -15,80 +16,6 @@
 #define IMU_SCALE_FACTOR 1.0f
 #define LAT_LNG_SCALE_FACTOR 1000000.0f // When decoding: lat = lat / 1000000.0f 
 #define SPEED_COURSE_SCALE_FACTOR 10.0f // When decoding: speed = speed / 10.0f
-
-#define FRAME_LEN 8
-
-/* static void packint16Frame(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor)
- * @brief: Split CAN frame 8-byte data payload into 4 2-byte (int16_t) values, applying the specified scale factor to each value. The resulting bytes are stored in the provided buffer.
- * @param: buf - The buffer to store the packed data.
- * @param: offset_0 - The first offset value.
- * @param: offset_1 - The second offset value.
- * @param: offset_2 - The third offset value.
- * @param: offset_3 - The fourth offset value.
- * @param: scale_factor - The scale factor for the data.
- */
-static void packint16Frame(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor) {
-    const int16_t data_0 = (int16_t)(offset_0 * scale_factor);
-    const int16_t data_1 = (int16_t)(offset_1 * scale_factor);
-    const int16_t data_2 = (int16_t)(offset_2 * scale_factor);
-    const int16_t data_3 = (int16_t)(offset_3 * scale_factor);
-
-    buf[0] = (uint8_t)(data_0 & 0xFF);
-    buf[1] = (uint8_t)((data_0 >> 8) & 0xFF);
-    buf[2] = (uint8_t)(data_1 & 0xFF);
-    buf[3] = (uint8_t)((data_1 >> 8) & 0xFF);
-    buf[4] = (uint8_t)(data_2 & 0xFF);
-    buf[5] = (uint8_t)((data_2 >> 8) & 0xFF);
-    buf[6] = (uint8_t)(data_3 & 0xFF);
-    buf[7] = (uint8_t)((data_3 >> 8) & 0xFF);
-}
-
-/* static void packuint16Frame(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor)
- * @brief: Split CAN frame 8-byte data payload into 4 2-byte (uint16_t) values, applying the specified scale factor to each value. The resulting bytes are stored in the provided buffer.
- * @param: buf - The buffer to store the packed data.
- * @param: offset_0 - The first offset value.
- * @param: offset_1 - The second offset value.
- * @param: offset_2 - The third offset value.
- * @param: offset_3 - The fourth offset value.
- * @param: scale_factor - The scale factor for the data.
- */
-static void packuint16Frame(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor) {
-    const uint16_t data_0 = (uint16_t)(offset_0 * scale_factor);
-    const uint16_t data_1 = (uint16_t)(offset_1 * scale_factor);
-    const uint16_t data_2 = (uint16_t)(offset_2 * scale_factor);
-    const uint16_t data_3 = (uint16_t)(offset_3 * scale_factor);
-
-    buf[0] = (uint8_t)(data_0 & 0xFF);
-    buf[1] = (uint8_t)((data_0 >> 8) & 0xFF);
-    buf[2] = (uint8_t)(data_1 & 0xFF);
-    buf[3] = (uint8_t)((data_1 >> 8) & 0xFF);
-    buf[4] = (uint8_t)(data_2 & 0xFF);
-    buf[5] = (uint8_t)((data_2 >> 8) & 0xFF);
-    buf[6] = (uint8_t)(data_3 & 0xFF);
-    buf[7] = (uint8_t)((data_3 >> 8) & 0xFF);
-}
-
-
-/* static void packint32Frame(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float scale_factor)
- * @brief: Split CAN frame 8-byte data payload into 2 4-byte (int32_t) values, applying the specified scale factor to each value. The resulting bytes are stored in the provided buffer.
- * @param: buf - The buffer to store the packed data.
- * @param: offset_0 - The first offset value.
- * @param: offset_1 - The second offset value.
- * @param: scale_factor - The scale factor for the data.
- */
-static void packint32Frame(uint8_t buf[FRAME_LEN], float offset_0, float offset_1, float scale_factor) {
-    const int32_t data_0 = (int32_t)(offset_0 * scale_factor);
-    const int32_t data_1 = (int32_t)(offset_1 * scale_factor);
-
-    buf[0] = (uint8_t)((data_0 >> 0) & 0xFF);
-    buf[1] = (uint8_t)((data_0 >> 8) & 0xFF);
-    buf[2] = (uint8_t)((data_0 >> 16) & 0xFF);
-    buf[3] = (uint8_t)((data_0 >> 24) & 0xFF);
-    buf[4] = (uint8_t)((data_1 >> 0) & 0xFF);
-    buf[5] = (uint8_t)((data_1 >> 8) & 0xFF);
-    buf[6] = (uint8_t)((data_1 >> 16) & 0xFF);
-    buf[7] = (uint8_t)((data_1 >> 24) & 0xFF);
-}
 
 /* static esp_err_t transmitint16Frame(uint32_t can_id, float offset_0, float offset_1, float offset_2, float offset_3, float scale_factor)
  * @brief: Transmits a CAN frame in int16_t format.
