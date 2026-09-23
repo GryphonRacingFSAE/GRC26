@@ -170,20 +170,19 @@ std::vector<uint8_t> frame(uint8_t version, uint8_t type, const std::vector<uint
     return bytes;
 }
 
-std::vector<uint8_t> powertrainFrame()
+std::vector<uint8_t> sensorsFrame()
 {
-    std::vector<uint8_t> body(58, 0);
+    std::vector<uint8_t> body(52, 0);
     put32(body, 0, 123456);
     put16(body, 4, 42);
-    put16(body, 6, 0x3FFF);
-    put16(body, 8, 0x3FFF);
-    put16(body, 10, 1234);
-    put16(body, 14, static_cast<uint16_t>(-1000));
-    put32(body, 16, static_cast<uint32_t>(-50000));
-    put16(body, 20, 1234);
-    put16(body, 44, 65535);
-    put16(body, 52, static_cast<uint16_t>(-1000));
-    return frame(2, 4, body);
+    put16(body, 6, 0xFFFF);
+    put16(body, 8, 0xFFFF);
+    put16(body, 10, static_cast<uint16_t>(-1000));
+    put16(body, 14, static_cast<uint16_t>(-1234));
+    put16(body, 23, static_cast<uint16_t>(-1000));
+    put32(body, 40, static_cast<uint32_t>(-1));
+    put32(body, 44, 1234567890);
+    return frame(3, 5, body);
 }
 
 std::vector<std::string> split(const std::string& line)
@@ -204,7 +203,7 @@ std::map<std::string, std::string> row(const std::string& line)
 {
     const auto names = split(telemetryCsvHeader());
     const auto values = split(line);
-    CHECK(names.size() == 75);
+    CHECK(names.size() == 56);
     CHECK(values.size() == names.size());
     std::map<std::string, std::string> result;
     for (size_t index = 0; index < names.size(); ++index) {
@@ -228,10 +227,10 @@ void checkPacketOperationOrder()
     CHECK(operations == expected);
 }
 
-void testPowertrain()
+void testSensors()
 {
     reset();
-    radioBytes = powertrainFrame();
+    radioBytes = sensorsFrame();
     receive();
     CHECK(rxActive);
     CHECK(startCalls == 2);
@@ -240,61 +239,107 @@ void testPowertrain()
     CHECK(Serial.lines.size() == 1);
     const auto values = row(Serial.lines.front());
     CHECK(values.at("event") == "rx_packet");
-    CHECK(values.at("packet_type") == "POWERTRAIN");
-    CHECK(values.at("schema_version") == "2");
+    CHECK(values.at("packet_type") == "SENSORS");
+    CHECK(values.at("schema_version") == "3");
     CHECK(values.at("rx_count") == "1");
     CHECK(values.at("rx_ms") == "987654");
     CHECK(values.at("rssi_dbm") == "-92.25");
     CHECK(values.at("snr_db") == "7.50");
-    CHECK(values.at("radio_len") == "65");
+    CHECK(values.at("radio_len") == "59");
     CHECK(values.at("seq") == "42");
     CHECK(values.at("tx_ms") == "123456");
-    CHECK(values.at("received_mask_hex") == "0x3FFF");
-    CHECK(values.at("fresh_mask_hex") == "0x3FFF");
-    CHECK(values.at("lambda_a") == "1.234");
-    CHECK(values.at("lambda_target") == "-1.000");
-    CHECK(values.at("lambda_error") == "-50.000");
-    CHECK(values.at("fuel_inj_pulse_width_ms") == "12.34");
-    CHECK(values.at("gear") == "65535");
+    CHECK(values.at("received_mask_hex") == "0xFFFF");
+    CHECK(values.at("fresh_mask_hex") == "0xFFFF");
+    CHECK(values.at("aero_pressure_1_pa") == "-1000");
+    CHECK(values.at("aero_ambient_temp_c") == "-12.34");
     CHECK(values.at("acceleration_x_g") == "-1.000");
+    CHECK(values.at("gps_latitude_deg") == "-0.0000001");
+    CHECK(values.at("gps_longitude_deg") == "123.4567890");
     CHECK(values.at("rpm").empty());
     ++groups;
 }
 
-void testLegacy()
+void testUnsupportedVersions()
+{
+    for (uint8_t version : {1, 2}) {
+        reset();
+        std::vector<uint8_t> body(28, 0);
+        radioBytes = frame(version, 1, body);
+        receive();
+        CHECK(rxActive);
+        checkPacketOperationOrder();
+        CHECK(Serial.lines.size() == 1);
+        const auto values = row(Serial.lines.front());
+        CHECK(values.at("event") == "rx_error");
+        CHECK(values.at("error_text") == "telemetry_version_unsupported");
+        CHECK(values.at("schema_version").empty());
+        CHECK(values.at("rpm").empty());
+    }
+    ++groups;
+}
+
+void testIndependentPackets()
 {
     reset();
-    std::vector<uint8_t> body(30, 0);
-    put32(body, 0, 2000);
-    put16(body, 4, 7);
-    put16(body, 6, 7500);
-    put16(body, 14, static_cast<uint16_t>(-1234));
-    put16(body, 20, static_cast<uint16_t>(-500));
-    put16(body, 26, static_cast<uint16_t>(-1));
-    put16(body, 28, 0x0012);
-    radioBytes = frame(1, 1, body);
-    receive();
+    LoRaRxTaskPoll();
     CHECK(rxActive);
-    checkPacketOperationOrder();
-    CHECK(Serial.lines.size() == 1);
-    const auto values = row(Serial.lines.front());
-    CHECK(values.at("event") == "rx_packet");
-    CHECK(values.at("packet_type") == "FAST");
-    CHECK(values.at("schema_version") == "1");
-    CHECK(values.at("rpm") == "7500");
-    CHECK(values.at("lambda_error") == "-1.234");
-    CHECK(values.at("coolant_temp_c") == "-50.0");
-    CHECK(values.at("gear") == "-1");
-    CHECK(values.at("status_bits_hex") == "0x0012");
-    CHECK(values.at("received_mask_hex").empty());
-    CHECK(values.at("rev_limit_active").empty());
+    for (uint8_t type : {1, 2, 3, 5}) {
+        std::vector<uint8_t> body(type == 5 ? 52 : type == 3 ? 26 : type == 2 ? 24 : 28, 0);
+        put32(body, 0, 2000);
+        put16(body, 4, type);
+        // Only one CAN source has arrived. None of these independent packets
+        // should be held waiting for other CAN IDs or other telemetry types.
+        const uint16_t source = type == 5 ? 0x4000 : type == 2 ? 0x0002 : type == 3 ? 0x2000 : 0x0001;
+        put16(body, 6, source);
+        put16(body, 8, type == 5 ? 0 : source);
+        if (type == 1) {
+            put16(body, 10, 7500);
+        } else if (type == 2) {
+            put16(body, 10, 1001);
+        } else if (type == 3) {
+            put16(body, 10, 4);
+            body[21] = 2;
+        } else {
+            put32(body, 40, static_cast<uint32_t>(-1));
+            put32(body, 44, 1234567890);
+        }
+        radioBytes = frame(3, type, body);
+        operations.clear();
+        LoRaRxTaskPoll();
+        checkPacketOperationOrder();
+        CHECK(rxActive);
+        CHECK(delays.empty());
+        const auto values = row(Serial.lines.back());
+        CHECK(values.at("event") == "rx_packet");
+        CHECK(values.at("schema_version") == "3");
+        CHECK(values.at("packet_type") == (type == 1 ? "FAST" : type == 2 ? "SLOW" : type == 3 ? "EVENT" : "SENSORS"));
+        CHECK(values.at("gear").empty());
+        CHECK(values.at("aero_node_state").empty());
+        if (type == 1) {
+            CHECK(values.at("rpm") == "7500");
+            CHECK(values.at("gps_latitude_deg").empty());
+        } else if (type == 2) {
+            CHECK(values.at("lambda_a") == "1.001");
+            CHECK(values.at("lambda_target").empty());
+        } else if (type == 3) {
+            CHECK(values.at("imu_node_state") == "2");
+            CHECK(values.at("alert_flags_hex") == "0x0004");
+        } else {
+            CHECK(values.at("gps_latitude_deg") == "-0.0000001");
+            CHECK(values.at("gps_longitude_deg") == "123.4567890");
+            CHECK(values.at("fresh_mask_hex") == "0x0000");
+            CHECK(values.at("gps_ground_speed_kph").empty());
+        }
+    }
+    CHECK(rxPacketCount == 4);
+    CHECK(Serial.lines.size() == 4);
     ++groups;
 }
 
 void testInvalidCrc()
 {
     reset();
-    radioBytes = powertrainFrame();
+    radioBytes = sensorsFrame();
     radioBytes.back() ^= 0x40;
     receive();
     CHECK(rxActive);
@@ -421,7 +466,7 @@ void testRearmFailureRetainsCompletedPacket()
 {
     for (int16_t nextStart : {static_cast<int16_t>(-12), LORA_API_BUSY}) {
         reset();
-        radioBytes = powertrainFrame();
+        radioBytes = sensorsFrame();
         LoRaRxTaskPoll();
         CHECK(rxActive);
         startResult = nextStart;
@@ -467,10 +512,10 @@ void testConsecutiveFastPackets()
         std::vector<uint8_t> body(28, 0);
         put32(body, 0, index * 20);
         put16(body, 4, static_cast<uint16_t>(index));
-        put16(body, 6, 0x3FFF);
-        put16(body, 8, 0x3FFF);
+        put16(body, 6, 0xFFFF);
+        put16(body, 8, 0xFFFF);
         put16(body, 10, static_cast<uint16_t>(7000 + index));
-        radioBytes = frame(2, 1, body);
+        radioBytes = frame(3, 1, body);
         clockMs = 1000 + index * 20;
         radioRssi = -92.25f;
         radioSnr = 7.5f;
@@ -497,8 +542,9 @@ void testConsecutiveFastPackets()
 
 int main()
 {
-    testPowertrain();
-    testLegacy();
+    testSensors();
+    testUnsupportedVersions();
+    testIndependentPackets();
     testInvalidCrc();
     testBusyTimeoutAndRearm();
     testRadioErrors();

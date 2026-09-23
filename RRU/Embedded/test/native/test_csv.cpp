@@ -1,23 +1,22 @@
 #include "Fixtures.h"
 #include "TelemetryCsv.h"
 
-#include <algorithm>
-#include <limits>
 #include <map>
 #include <string>
 
 namespace
 {
-
-const TelemetryRxMetadata metadata = {17, 654321, -96.25f, -4.5f, 65};
-const char* const legacyHeader = "event,rx_count,rx_ms,rssi_dbm,snr_db,radio_len,packet_type,seq,tx_ms,alert_flags_hex,"
-                                 "status_bits_hex,rpm,tps_pct,map_kpa,lambda_avg,lambda_error,oil_pressure_kpa,"
-                                 "fuel_pressure_kpa,coolant_temp_c,battery_v,vehicle_speed_kph,gear,oil_temp_c,"
-                                 "intake_air_temp_c,fuel_inj_duty_pct,fuel_trim_total_pct,lambda_corr_a_pct,"
-                                 "lambda_corr_b_pct,ignition_timing_deg,ignition_cut_pct,fuel_cut_pct,ecu_error_count,"
-                                 "ecu_lost_sync_count,ecu_temp_c,egt_highest_c,egt_delta_c,knock_count,"
-                                 "knock_correction_deg,boost_target_kpa,boost_duty_pct,coolant_pressure_kpa,"
-                                 "wastegate_pressure_kpa,error_code,error_text";
+const TelemetryRxMetadata metadata = {17, 654321, -96.25f, -4.5f, 59};
+// Independent expected schema: only transport metadata and the 40 DBC signals.
+const char* const expectedHeader =
+    "event,rx_count,rx_ms,rssi_dbm,snr_db,radio_len,packet_type,seq,tx_ms,schema_version,received_mask_he"
+    "x,fresh_mask_hex,alert_flags_hex,status_bits_hex,error_code,error_text,rpm,tps_pct,lambda_avg,lambda"
+    "_a,lambda_b,fuel_inj_pulse_width_ms,fuel_inj_duty_pct,vehicle_speed_kph,knock_detected,brake_pedal_a"
+    "ctive,clutch_pedal_active,rev_limit_rpm,lambda_target,battery_v,intake_air_temp_c,coolant_temp_c,gea"
+    "r,user_channel_1,aero_pressure_1_pa,aero_pressure_2_pa,aero_ambient_temp_c,aero_ambient_pressure_hpa"
+    ",aero_node_state,aero_sensor_flags,aero_fault_flags,aero_sequence,acceleration_x_g,acceleration_y_g,"
+    "acceleration_z_g,yaw_rate_dps,pitch_rate_dps,roll_rate_dps,imu_node_state,imu_sensor_flags,imu_fault"
+    "_flags,imu_sequence,gps_latitude_deg,gps_longitude_deg,gps_ground_speed_kph,gps_course_deg";
 
 std::vector<std::string> split(const std::string& value)
 {
@@ -48,7 +47,7 @@ std::map<std::string, std::string> rowFields(const char* line)
 {
     const std::vector<std::string> names = split(telemetryCsvHeader());
     const std::vector<std::string> values = split(line);
-    CHECK_EQ(names.size(), 75u);
+    CHECK_EQ(names.size(), 56u);
     CHECK_EQ(values.size(), names.size());
     CHECK(std::strchr(line, '\n') == nullptr);
     CHECK(std::strchr(line, '\r') == nullptr);
@@ -84,139 +83,92 @@ struct ExpectedField {
     uint16_t sources;
 };
 
-// Hand-calculated from the independent wire vectors, not production conversion
-// helpers. Nonzero values over 32767 expose accidental sign extension.
 const ExpectedField measurements[] = {
     {1, "rpm", "4353", 1u << 0},
     {1, "tps_pct", "435.4", 1u << 0},
-    {1, "map_kpa", "435.5", 1u << 0},
     {1, "lambda_avg", "65.535", 1u << 0},
-    {1, "oil_pressure_kpa", "3917.1", 1u << 10},
-    {1, "battery_v", "304.65", 1u << 8},
     {1, "vehicle_speed_kph", "1306.0", 1u << 2},
-    {1, "brake_pressure_kpa", "4787.3", 1u << 12},
-    {1, "status_bits_hex", "0xA55A", 1u << 5},
-    {2, "oil_temp_c", "-12.3", 1u << 10},
-    {2, "coolant_temp_c", "6323.6", 1u << 8},
-    {2, "intake_air_temp_c", "6323.5", 1u << 8},
-    {2, "ecu_temp_c", "34818", 1u << 9},
-    {2, "egt_delta_c", "34817", 1u << 9},
-    {2, "fuel_pressure_kpa", "4352.1", 1u << 11},
-    {2, "coolant_pressure_kpa", "4352.3", 1u << 11},
-    {2, "ecu_error_count", "34819", 1u << 9},
-    {2, "ecu_lost_sync_count", "34820", 1u << 9},
-    {2, "knock_count", "26115", 1u << 7},
-    {2, "last_knock_cylinder", "26116", 1u << 7},
-    {3, "status_bits_hex", "0xA55A", 1u << 5},
+    {1, "status_bits_hex", "0x0380", 1u << 3},
+    {1, "knock_detected", "1", 1u << 3},
+    {1, "brake_pedal_active", "1", 1u << 3},
+    {1, "clutch_pedal_active", "1", 1u << 3},
+    {1, "rev_limit_rpm", "9000", 1u << 3},
+    {1, "gear", "65535", 1u << 6},
+    {1, "user_channel_1", "4787.3", 1u << 7},
+    {1, "battery_v", "304.65", 1u << 5},
+    {2, "lambda_a", "8.705", 1u << 1},
+    {2, "lambda_b", "8.706", 1u << 1},
+    {2, "lambda_target", "-32.768", 1u << 4},
+    {2, "fuel_inj_pulse_width_ms", "130.57", 1u << 2},
+    {2, "fuel_inj_duty_pct", "1305.8", 1u << 2},
+    {2, "intake_air_temp_c", "6323.5", 1u << 5},
+    {2, "coolant_temp_c", "6323.6", 1u << 5},
+    {3, "status_bits_hex", "0x0380", 1u << 3},
     {3, "rpm", "4353", 1u << 0},
-    {3, "oil_pressure_kpa", "3917.1", 1u << 10},
-    {3, "fuel_pressure_kpa", "4352.1", 1u << 11},
-    {3, "coolant_temp_c", "6323.6", 1u << 8},
-    {3, "battery_v", "304.65", 1u << 8},
-    {3, "lambda_error", "98.303", (1u << 0) | (1u << 6)},
-    {3, "ecu_error_count", "34819", 1u << 9},
-    {3, "ecu_lost_sync_count", "34820", 1u << 9},
-    {3, "knock_count", "26115", 1u << 7},
-    {3, "last_knock_cylinder", "26116", 1u << 7},
-    {3, "fuel_cut_pct", "12", 1u << 2},
-    {3, "ignition_cut_pct", "13", 1u << 1},
-    {3, "traction_cut_request_pct", "2176.1", 1u << 4},
-    {3, "knock_level_peak", "26113", 1u << 7},
-    {3, "knock_correction_deg", "2611.4", 1u << 7},
-    {4, "lambda_a", "8.705", 1u << 1},
-    {4, "lambda_b", "8.706", 1u << 1},
-    {4, "lambda_target", "-32.768", 1u << 6},
-    {4, "lambda_error", "98.303", (1u << 0) | (1u << 6)},
-    {4, "fuel_inj_pulse_width_ms", "130.57", 1u << 2},
-    {4, "fuel_inj_duty_pct", "1305.8", 1u << 2},
-    {4, "fuel_cut_pct", "12", 1u << 2},
-    {4, "ignition_timing_deg", "870.7", 1u << 1},
-    {4, "ignition_cut_pct", "13", 1u << 1},
-    {4, "driven_wheel_speed_kph", "1741.0", 1u << 3},
-    {4, "non_driven_wheel_speed_kph", "1740.9", 1u << 3},
-    {4, "traction_slip_measured_pct", "1741.1", 1u << 3},
-    {4, "traction_slip_target_pct", "1741.2", 1u << 3},
-    {4, "traction_cut_request_pct", "2176.1", 1u << 4},
-    {4, "lambda_corr_a_pct", "2176.2", 1u << 4},
-    {4, "lambda_corr_b_pct", "2176.3", 1u << 4},
-    {4, "gear", "39169", 1u << 10},
-    {4, "boost_duty_pct", "3917.0", 1u << 10},
-    {4, "knock_level_peak", "26113", 1u << 7},
-    {4, "knock_correction_deg", "2611.4", 1u << 7},
-    {4, "acceleration_x_g", "-0.321", 1u << 13},
-    {4, "acceleration_y_g", "0.000", 1u << 13},
-    {4, "acceleration_z_g", "32.767", 1u << 13},
+    {3, "knock_detected", "1", 1u << 3},
+    {3, "brake_pedal_active", "1", 1u << 3},
+    {3, "clutch_pedal_active", "1", 1u << 3},
+    {3, "aero_node_state", "3", 1u << 10},
+    {3, "aero_sensor_flags", "165", 1u << 10},
+    {3, "aero_fault_flags", "32769", 1u << 10},
+    {3, "aero_sequence", "255", 1u << 10},
+    {3, "imu_node_state", "2", 1u << 13},
+    {3, "imu_sensor_flags", "90", 1u << 13},
+    {3, "imu_fault_flags", "65535", 1u << 13},
+    {3, "imu_sequence", "128", 1u << 13},
+    {5, "aero_pressure_1_pa", "-32768", 1u << 8},
+    {5, "aero_pressure_2_pa", "32767", 1u << 8},
+    {5, "aero_ambient_temp_c", "-12.34", 1u << 9},
+    {5, "aero_ambient_pressure_hpa", "6553.5", 1u << 9},
+    {5, "aero_node_state", "3", 1u << 10},
+    {5, "aero_sensor_flags", "165", 1u << 10},
+    {5, "aero_fault_flags", "32769", 1u << 10},
+    {5, "aero_sequence", "255", 1u << 10},
+    {5, "acceleration_x_g", "-32.768", 1u << 11},
+    {5, "acceleration_y_g", "0.000", 1u << 11},
+    {5, "acceleration_z_g", "32.767", 1u << 11},
+    {5, "yaw_rate_dps", "-327.68", 1u << 12},
+    {5, "pitch_rate_dps", "-0.01", 1u << 12},
+    {5, "roll_rate_dps", "327.67", 1u << 12},
+    {5, "imu_node_state", "2", 1u << 13},
+    {5, "imu_sensor_flags", "90", 1u << 13},
+    {5, "imu_fault_flags", "65535", 1u << 13},
+    {5, "imu_sequence", "128", 1u << 13},
+    {5, "gps_latitude_deg", "-214.7483648", 1u << 14},
+    {5, "gps_longitude_deg", "214.7483647", 1u << 14},
+    {5, "gps_ground_speed_kph", "655.35", 1u << 15},
+    {5, "gps_course_deg", "359.99", 1u << 15},
 };
 
 void setMasks(TelemetryReceivedPacket& packet, uint16_t received, uint16_t fresh)
 {
-    switch (packet.packet.type) {
-    case 1:
-        packet.packet.data.fast_v2.received_mask = received;
-        packet.packet.data.fast_v2.fresh_mask = fresh;
-        break;
-    case 2:
-        packet.packet.data.slow_v2.received_mask = received;
-        packet.packet.data.slow_v2.fresh_mask = fresh;
-        break;
-    case 3:
-        packet.packet.data.event_v2.received_mask = received;
-        packet.packet.data.event_v2.fresh_mask = fresh;
-        break;
-    case 4:
-        packet.packet.data.powertrain_v2.received_mask = received;
-        packet.packet.data.powertrain_v2.fresh_mask = fresh;
-        break;
-    }
+    // Common offsets are part of the published wire contract.
+    auto* body = reinterpret_cast<uint8_t*>(&packet.packet.data);
+    body[6] = static_cast<uint8_t>(received);
+    body[7] = static_cast<uint8_t>(received >> 8);
+    body[8] = static_cast<uint8_t>(fresh);
+    body[9] = static_cast<uint8_t>(fresh >> 8);
 }
 
-void testAllMeasurementsAndMasks()
+void testMeasurementsAndMasks()
 {
-    const std::string header = telemetryCsvHeader();
-    CHECK(header.substr(0, std::strlen(legacyHeader)) == legacyHeader);
-    CHECK_EQ(header[std::strlen(legacyHeader)], ',');
-    CHECK(header.find("ac_idle") == std::string::npos);
-    CHECK(header.find("nitrous") == std::string::npos);
-    CHECK(header.find("severity") == std::string::npos);
-
-    for (uint8_t type = 1; type <= 4; ++type) {
-        TelemetryReceivedPacket packet = decodeGolden(2, type);
+    CHECK(std::string(telemetryCsvHeader()) == expectedHeader);
+    for (uint8_t type : {1, 2, 3, 5}) {
+        TelemetryReceivedPacket packet = decodeGolden(type);
         auto fields = formatted(packet);
-        expect(fields, "event", "rx_packet");
-        expect(fields, "rx_count", "17");
-        expect(fields, "rx_ms", "654321");
-        expect(fields, "rssi_dbm", "-96.25");
-        expect(fields, "snr_db", "-4.50");
-        expect(fields, "radio_len", "65");
-        expect(fields, "schema_version", "2");
+        expect(fields, "schema_version", "3");
+        expect(fields, "received_mask_hex", "0xFFFF");
+        expect(fields, "fresh_mask_hex", "0xA555");
         expect(fields, "seq", "43981");
         expect(fields, "tx_ms", "305419896");
-        expect(fields, "received_mask_hex", "0x3FFF");
-        expect(fields, "fresh_mask_hex", "0x1555");
+        expect(fields, "packet_type", type == 1 ? "FAST" : type == 2 ? "SLOW" : type == 3 ? "EVENT" : "SENSORS");
+        expect(fields, "alert_flags_hex", type == 3 ? "0x0007" : "");
         for (const ExpectedField& measurement : measurements) {
             if (measurement.type == type) {
                 expect(fields, measurement.name, measurement.value);
             }
         }
-        // No obsolete V1 field is fabricated when it is absent from V2.
-        for (const char* absent :
-             {"fuel_trim_total_pct", "egt_highest_c", "boost_target_kpa", "wastegate_pressure_kpa"}) {
-            expect(fields, absent, "");
-        }
-        if (type == 3) {
-            expect(fields, "alert_flags_hex", "0x0E0F");
-        } else {
-            expect(fields, "alert_flags_hex", "");
-        }
-        if (type == 1) {
-            expect(fields, "gear", "");
-            expect(fields, "lambda_error", "");
-            expect(fields, "fuel_pressure_kpa", "");
-        }
-
-        // Freshness reports the snapshot's age independently of receipt. Stale
-        // measurements retain their numeric values; missing sources stay blank.
-        setMasks(packet, 0x3FFF, 0);
+        setMasks(packet, 0xFFFF, 0);
         fields = formatted(packet);
         expect(fields, "fresh_mask_hex", "0x0000");
         for (const ExpectedField& measurement : measurements) {
@@ -224,8 +176,10 @@ void testAllMeasurementsAndMasks()
                 expect(fields, measurement.name, measurement.value);
             }
         }
-        for (unsigned missing = 0; missing < 14; ++missing) {
-            const uint16_t received = static_cast<uint16_t>(0x3FFF & ~(1u << missing));
+        // Each CAN source can independently disappear without hiding other
+        // sources, waiting for a complete set, or manufacturing physical zeros.
+        for (unsigned missing = 0; missing < 16; ++missing) {
+            const uint16_t received = static_cast<uint16_t>(0xFFFFu & ~(1u << missing));
             setMasks(packet, received, received);
             fields = formatted(packet);
             for (const ExpectedField& measurement : measurements) {
@@ -243,147 +197,85 @@ void testAllMeasurementsAndMasks()
             }
         }
     }
+    auto sensors = decodeGolden(5);
+    sensors.packet.data.sensors.gps_latitude_deg_x1e7 = -1;
+    sensors.packet.data.sensors.gps_longitude_deg_x1e7 = 0;
+    auto fields = formatted(sensors);
+    expect(fields, "gps_latitude_deg", "-0.0000001");
+    expect(fields, "gps_longitude_deg", "0.0000000");
+    // A later packet contains only its own fields, with no cached sensor values.
+    fields = formatted(decodeGolden(1));
+    expect(fields, "gps_latitude_deg", "");
+    expect(fields, "acceleration_x_g", "");
 }
 
-void testStatusBitsAndZeroValues()
+void testStatusAndZeroValues()
 {
-    const char* const statusNames[] = {
-        "shift_cut_active",
-        "rev_limit_active",
-        "anti_lag_active",
-        "launch_control_active",
-        "tc_power_limiter_active",
-        "throttle_blip_active",
-        nullptr,
-        "knock_detected",
-        "brake_pedal_active",
-        "clutch_pedal_active",
-        "speed_limiter_active",
-        "gp_limiter_active",
-        "user_cut_active",
-        "ecu_logging",
-        nullptr,
-        nullptr,
-    };
     for (uint8_t type : {1, 3}) {
-        TelemetryReceivedPacket packet = decodeGolden(2, type);
-        setMasks(packet, 0x3FFF, 0x3FFF);
-        for (unsigned bit = 0; bit < 16; ++bit) {
+        auto packet = decodeGolden(type);
+        for (uint16_t status : {0, 0x0080, 0x0100, 0x0200, 0x0380}) {
             if (type == 1) {
-                packet.packet.data.fast_v2.status_bits = static_cast<uint16_t>(1u << bit);
+                packet.packet.data.fast.status_bits = status;
             } else {
-                packet.packet.data.event_v2.status_bits = static_cast<uint16_t>(1u << bit);
+                packet.packet.data.event.status_bits = status;
             }
             const auto fields = formatted(packet);
-            char rawStatus[8];
-            std::snprintf(rawStatus, sizeof(rawStatus), "0x%04X", 1u << bit);
-            expect(fields, "status_bits_hex", rawStatus);
-            for (unsigned named = 0; named < 16; ++named) {
-                if (statusNames[named] != nullptr) {
-                    expect(fields, statusNames[named], named == bit ? "1" : "0");
-                }
-            }
-        }
-        setMasks(packet, 0x3FDF, 0x3FDF);
-        const auto fields = formatted(packet);
-        for (const char* name : statusNames) {
-            if (name != nullptr) {
-                expect(fields, name, "");
-            }
+            expect(fields, "knock_detected", (status & 0x0080) ? "1" : "0");
+            expect(fields, "brake_pedal_active", (status & 0x0100) ? "1" : "0");
+            expect(fields, "clutch_pedal_active", (status & 0x0200) ? "1" : "0");
         }
     }
     TelemetryReceivedPacket zero = {};
-    zero.version = 2;
-    zero.packet.type = 1;
-    setMasks(zero, 0x3FFF, 0x3FFF);
+    zero.version = TelemetryProtocol::VERSION;
+    zero.packet.type = TELEMETRY_PACKET_FAST;
+    setMasks(zero, 0xFFFF, 0xFFFF);
     const auto fields = formatted(zero);
     expect(fields, "rpm", "0");
     expect(fields, "vehicle_speed_kph", "0.0");
-    expect(fields, "brake_pressure_kpa", "0.0");
     expect(fields, "lambda_avg", "0.000");
     expect(fields, "battery_v", "0.00");
-    expect(fields, "shift_cut_active", "0");
-
-    TelemetryReceivedPacket powertrain = decodeGolden(2, 4);
-    powertrain.packet.data.powertrain_v2.lambda_error_x1000 = -32767;
-    powertrain.packet.data.powertrain_v2.acceleration_x_mg = -32768;
-    const auto signedFields = formatted(powertrain);
-    expect(signedFields, "lambda_error", "-32.767");
-    expect(signedFields, "acceleration_x_g", "-32.768");
-    powertrain.packet.data.powertrain_v2.lambda_error_x1000 = std::numeric_limits<int32_t>::min();
-    expect(formatted(powertrain), "lambda_error", "-2147483.648");
-    powertrain.packet.data.powertrain_v2.lambda_error_x1000 = std::numeric_limits<int32_t>::max();
-    expect(formatted(powertrain), "lambda_error", "2147483.647");
-}
-
-void testV1Csv()
-{
-    for (uint8_t type = 1; type <= 3; ++type) {
-        const auto fields = formatted(decodeGolden(1, type));
-        expect(fields, "schema_version", "1");
-        expect(fields, "received_mask_hex", "");
-        expect(fields, "fresh_mask_hex", "");
-        const auto names = split(telemetryCsvHeader());
-        for (size_t index = 45; index < names.size(); ++index) {
-            expect(fields, names[index].c_str(), "");
-        }
-        if (type == 1 || type == 3) {
-            expect(fields, "lambda_error", "-0.123");
-            expect(fields, "coolant_temp_c", "-12.3");
-            expect(fields, "status_bits_hex", "0xA55A");
-        }
-        if (type == 1) {
-            expect(fields, "gear", "-123");
-            expect(fields, "lambda_avg", "65.535");
-        }
-        if (type == 2) {
-            expect(fields, "oil_temp_c", "-12.3");
-            expect(fields, "intake_air_temp_c", "-12.2");
-            expect(fields, "wastegate_pressure_kpa", "462.6");
-        }
-    }
+    expect(fields, "gear", "0");
+    expect(fields, "knock_detected", "0");
 }
 
 void testCsvBoundsAndErrors()
 {
-    for (uint8_t version : {1, 2}) {
-        for (uint8_t type = 1; type <= (version == 1 ? 3 : 4); ++type) {
-            const TelemetryReceivedPacket packet = decodeGolden(version, type);
-            char line[TELEMETRY_CSV_BUFFER_SIZE];
-            CHECK(formatTelemetryCsv(line, sizeof(line), packet, metadata));
-            const size_t required = std::strlen(line) + 1;
-            GuardedPayload exact(required);
-            CHECK(formatTelemetryCsv(reinterpret_cast<char*>(exact.data), required, packet, metadata));
-            CHECK(std::strcmp(reinterpret_cast<char*>(exact.data), line) == 0);
-            for (size_t capacity = 0; capacity < required; ++capacity) {
-                GuardedPayload shortOutput(capacity);
-                if (capacity != 0) {
-                    std::memset(shortOutput.data, 0xA5, capacity);
-                }
-                CHECK(!formatTelemetryCsv(reinterpret_cast<char*>(shortOutput.data), capacity, packet, metadata));
-                if (capacity != 0) {
-                    CHECK_EQ(shortOutput.data[0], 0);
-                }
+    for (uint8_t type : {1, 2, 3, 5}) {
+        const TelemetryReceivedPacket packet = decodeGolden(type);
+        char line[TELEMETRY_CSV_BUFFER_SIZE];
+        CHECK(formatTelemetryCsv(line, sizeof(line), packet, metadata));
+        const size_t required = std::strlen(line) + 1;
+        GuardedPayload exact(required);
+        CHECK(formatTelemetryCsv(reinterpret_cast<char*>(exact.data), required, packet, metadata));
+        CHECK(std::strcmp(reinterpret_cast<char*>(exact.data), line) == 0);
+        for (size_t capacity = 0; capacity < required; ++capacity) {
+            GuardedPayload shortOutput(capacity);
+            if (capacity != 0) {
+                std::memset(shortOutput.data, 0xA5, capacity);
             }
-            CHECK(!formatTelemetryCsv(nullptr, sizeof(line), packet, metadata));
+            CHECK(!formatTelemetryCsv(reinterpret_cast<char*>(shortOutput.data), capacity, packet, metadata));
+            if (capacity != 0) {
+                CHECK_EQ(shortOutput.data[0], 0);
+            }
         }
+        CHECK(!formatTelemetryCsv(nullptr, sizeof(line), packet, metadata));
     }
     char line[TELEMETRY_CSV_BUFFER_SIZE];
-    for (uint8_t version : {0, 3, 255}) {
-        TelemetryReceivedPacket invalid = decodeGolden(2, 1);
+    for (uint8_t version : {0, 1, 2, 4, 255}) {
+        TelemetryReceivedPacket invalid = decodeGolden(1);
         invalid.version = version;
         std::memset(line, 0xA5, sizeof(line));
         CHECK(!formatTelemetryCsv(line, sizeof(line), invalid, metadata));
         CHECK_EQ(line[0], 0);
     }
-    for (uint8_t type : {0, 5, 255}) {
-        TelemetryReceivedPacket invalid = decodeGolden(2, 1);
+    for (uint8_t type : {0, 4, 255}) {
+        TelemetryReceivedPacket invalid = decodeGolden(1);
         invalid.packet.type = type;
         CHECK(!formatTelemetryCsv(line, sizeof(line), invalid, metadata));
         CHECK_EQ(line[0], 0);
     }
     // A failed decode cannot be promoted to a normal measurement CSV row.
-    TelemetryReceivedPacket rejected = decodeGolden(2, 1);
+    TelemetryReceivedPacket rejected = decodeGolden(1);
     const uint8_t badFrame[] = {0, 0, 2, 1, 0, 0, 0};
     CHECK(decodeTelemetryRadioPayload(badFrame, sizeof(badFrame), rejected) != TelemetryDecodeResult::Ok);
     CHECK(!formatTelemetryCsv(line, sizeof(line), rejected, metadata));
@@ -395,7 +287,7 @@ void testCsvBoundsAndErrors()
     expect(fields, "error_code", "-7");
     expect(fields, "error_text", "crc_mismatch");
     expect(fields, "rx_count", "17");
-    expect(fields, "radio_len", "65");
+    expect(fields, "radio_len", "59");
     expect(fields, "rpm", "");
     expect(fields, "schema_version", "");
     const size_t required = std::strlen(line) + 1;
@@ -421,8 +313,7 @@ void testCsvBoundsAndErrors()
 
 void runCsvTests()
 {
-    testAllMeasurementsAndMasks();
-    testStatusBitsAndZeroValues();
-    testV1Csv();
+    testMeasurementsAndMasks();
+    testStatusAndZeroValues();
     testCsvBoundsAndErrors();
 }

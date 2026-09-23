@@ -54,28 +54,28 @@ uint16_t referenceCrc(const uint8_t* bytes, size_t length)
 
 void verifyMockStream()
 {
-    const size_t expectedLengths[] = {0, 35, 39, 53, 65};
-    const uint32_t periods[] = {0, 20, 2000, 0, 6000};
-    size_t counts[] = {0, 0, 0, 0, 0};
+    const size_t expectedLengths[] = {0, 35, 31, 33, 0, 59};
+    const uint32_t periods[] = {0, 20, 2000, 0, 0, 200};
+    size_t counts[] = {0, 0, 0, 0, 0, 0};
     bool eventSeen[13] = {};
     uint32_t previousTimestamp = 0;
     uint16_t expectedSequence = 0;
 
     for (const auto& packet : queuedPackets) {
-        CHECK(packet.type >= 1 && packet.type <= 4);
-        uint8_t bytes[TelemetryV2::MAX_RADIO_PAYLOAD] = {};
+        CHECK(packet.type == 1 || packet.type == 2 || packet.type == 3 || packet.type == 5);
+        uint8_t bytes[TelemetryProtocol::MAX_RADIO_PAYLOAD] = {};
         size_t length = 0;
         CHECK(buildTelemetryRadioPayload(packet, bytes, sizeof(bytes), &length));
         CHECK(length == expectedLengths[packet.type]);
-        CHECK(bytes[0] == 'T' && bytes[1] == 'M' && bytes[2] == 2);
+        CHECK(bytes[0] == 'T' && bytes[1] == 'M' && bytes[2] == 3);
         CHECK(bytes[3] == packet.type && bytes[4] == length - 7);
         CHECK(readU16(bytes + length - 2) == referenceCrc(bytes, length - 2));
 
         const uint32_t timestamp = readU32(bytes + 5);
         CHECK(timestamp >= previousTimestamp && timestamp <= endTimeMs);
         CHECK(readU16(bytes + 9) == expectedSequence++);
-        CHECK(readU16(bytes + 11) == 0x3FFF); // All fourteen CAN sources received.
-        CHECK(readU16(bytes + 13) == 0x3FFF); // Every source remains fresh.
+        CHECK(readU16(bytes + 11) == 0xFFFF); // All sixteen CAN sources received.
+        CHECK(readU16(bytes + 13) == 0xFFFF); // Every source remains fresh.
         previousTimestamp = timestamp;
         ++counts[packet.type];
 
@@ -85,69 +85,64 @@ void verifyMockStream()
 
         const uint32_t seconds = timestamp / 1000;
         const uint32_t step = seconds % 60;
-        const uint16_t status = ECU_STATUS_ECU_IS_LOGGING |
-                                ((seconds / 5) % 2 ? ECU_STATUS_BRAKE_PEDAL_ACTIVE : 0);
+        const uint16_t status = (seconds / 5) % 2 ? ECU_STATUS_BRAKE_PEDAL_ACTIVE : 0;
         if (packet.type == TELEMETRY_PACKET_FAST) {
-            CHECK(packet.data.fast_v2.rpm == 1000 + 100 * step);
-            CHECK(packet.data.fast_v2.vehicle_speed_kph_x10 == 10 * step);
-            CHECK(packet.data.fast_v2.status_bits == status);
+            CHECK(packet.data.fast.rpm == 1000 + 100 * step);
+            CHECK(packet.data.fast.vehicle_speed_kph_x10 == 10 * step);
+            CHECK(packet.data.fast.status_bits == status);
         } else if (packet.type == TELEMETRY_PACKET_SLOW) {
-            CHECK(packet.data.slow_v2.oil_temp_c_x10 == 850 + static_cast<int32_t>(step));
-            CHECK(packet.data.slow_v2.coolant_temp_c_x10 == 800 + step);
-            CHECK(packet.data.slow_v2.intake_air_temp_c_x10 == 250 + step);
-            CHECK(packet.data.slow_v2.knock_count == seconds / 5);
-            CHECK(packet.data.slow_v2.ecu_error_count == seconds / 10);
-            CHECK(packet.data.slow_v2.ecu_lost_sync_count == seconds / 15);
-        } else if (packet.type == TELEMETRY_PACKET_POWERTRAIN) {
-            CHECK(packet.data.powertrain_v2.lambda_target_x1000 == 1000);
-            CHECK(packet.data.powertrain_v2.lambda_error_x1000 == static_cast<int32_t>(step) - 50);
-            CHECK(packet.data.powertrain_v2.acceleration_x_mg == static_cast<int32_t>(step) * 10 - 300);
-            CHECK(packet.data.powertrain_v2.acceleration_y_mg == 300 - static_cast<int32_t>(step) * 10);
-            CHECK(packet.data.powertrain_v2.acceleration_z_mg == 1000 + static_cast<int32_t>(step));
-            CHECK(packet.data.powertrain_v2.gear == 1 + step / 10);
+            CHECK(packet.data.slow.coolant_temp_c_x10 == 800 + step);
+            CHECK(packet.data.slow.intake_air_temp_c_x10 == 250 + step);
+            CHECK(packet.data.slow.lambda_target_x1000 == 1000);
+        } else if (packet.type == TELEMETRY_PACKET_SENSORS) {
+            const auto& sensors = packet.data.sensors;
+            CHECK(sensors.acceleration_x_mg == static_cast<int32_t>(step) * 10 - 300);
+            CHECK(sensors.acceleration_y_mg == 300 - static_cast<int32_t>(step) * 10);
+            CHECK(sensors.acceleration_z_mg == 1000 + static_cast<int32_t>(step));
+            CHECK(sensors.aero_pressure_1_pa == -100 - static_cast<int32_t>(step));
+            CHECK(sensors.aero_pressure_2_pa == 200 + static_cast<int32_t>(step));
+            CHECK(sensors.aero_ambient_temp_c_x100 == 2500 + static_cast<int32_t>(step));
+            CHECK(sensors.aero_ambient_pressure_hpa_x10 == 10132);
+            CHECK(sensors.aero_node_state == 1 && sensors.imu_node_state == 1);
+            CHECK(sensors.aero_sensor_flags == 3 && sensors.imu_sensor_flags == 3);
+            CHECK(sensors.aero_fault_flags == 0 && sensors.imu_fault_flags == 0);
+            CHECK(sensors.aero_sequence == static_cast<uint8_t>(timestamp / 20));
+            CHECK(sensors.imu_sequence == static_cast<uint8_t>(timestamp / 20));
+            CHECK(sensors.yaw_rate_dps_x100 == -500 + static_cast<int32_t>(step));
+            CHECK(sensors.pitch_rate_dps_x100 == 100 + static_cast<int32_t>(step));
+            CHECK(sensors.roll_rate_dps_x100 == 200 + static_cast<int32_t>(step));
+            CHECK(sensors.gps_latitude_deg_x1e7 == 430000000 + static_cast<int32_t>(step) * 100);
+            CHECK(sensors.gps_longitude_deg_x1e7 == -790000000 + static_cast<int32_t>(step) * 100);
+            CHECK(sensors.gps_ground_speed_kph_x100 == 100 * step);
+            CHECK(sensors.gps_course_deg_x100 == 9000 + step);
         } else if (packet.type == TELEMETRY_PACKET_EVENT) {
             CHECK(timestamp % 5000 == 0);
-            CHECK(packet.data.event_v2.rpm == 1000 + 100 * step);
-            CHECK(packet.data.event_v2.status_bits == status);
-            CHECK(packet.data.event_v2.knock_count == seconds / 5);
-            CHECK(packet.data.event_v2.ecu_error_count == seconds / 10);
-            CHECK(packet.data.event_v2.ecu_lost_sync_count == seconds / 15);
-            if (timestamp % 5000 == 0) {
-                const size_t eventIndex = timestamp / 5000;
-                CHECK(!eventSeen[eventIndex]);
-                eventSeen[eventIndex] = true;
-                uint16_t expectedFlags = TelemetryV2::STATUS_CHANGED;
-                if (timestamp > 0) {
-                    expectedFlags |= TelemetryV2::KNOCK_COUNT_INCREMENTED;
-                    expectedFlags |= TelemetryV2::FUEL_CUT_CHANGED | TelemetryV2::IGNITION_CUT_CHANGED |
-                                     TelemetryV2::TRACTION_CUT_CHANGED;
-                    if (timestamp % 10000 == 0) {
-                        expectedFlags |= TelemetryV2::ECU_ERROR_CHANGED;
-                    }
-                    if (timestamp % 15000 == 0) {
-                        expectedFlags |= TelemetryV2::LOST_SYNC_CHANGED;
-                    }
-                }
-                CHECK(packet.data.event_v2.alert_flags == expectedFlags);
-            }
+            CHECK(packet.data.event.rpm == 1000 + 100 * step);
+            CHECK(packet.data.event.status_bits == status);
+            const size_t eventIndex = timestamp / 5000;
+            CHECK(!eventSeen[eventIndex]);
+            eventSeen[eventIndex] = true;
+            const uint16_t expectedFlags = timestamp == 0
+                ? TelemetryProtocol::AERO_STATUS_CHANGED | TelemetryProtocol::IMU_STATUS_CHANGED : TelemetryProtocol::STATUS_CHANGED;
+            CHECK(packet.data.event.alert_flags == expectedFlags);
         }
     }
 
     CHECK(counts[TELEMETRY_PACKET_FAST] == 3000);
     CHECK(counts[TELEMETRY_PACKET_SLOW] == 30);
-    CHECK(counts[TELEMETRY_PACKET_POWERTRAIN] == 10);
+    CHECK(counts[TELEMETRY_PACKET_SENSORS] == 300);
     CHECK(counts[TELEMETRY_PACKET_EVENT] == 13);
     for (bool seen : eventSeen) {
         CHECK(seen);
     }
-    CHECK(ecu.hasCanData && ecu.received_mask == 0x3FFF);
+    CHECK(ecu.hasCanData && ecu.received_mask == 0xFFFF);
     CHECK(ecu.lastCanRxMs == endTimeMs);
     for (uint32_t receivedAt : ecu.last_received_ms) {
         CHECK(receivedAt == endTimeMs);
     }
-    // The mock source loops its driving values after a minute; counters keep rising.
+    // Driving values repeat after a minute; node sequence bytes continue to roll over.
     CHECK(ecu.rpm == 1000 && ecu.vehicle_speed_kph_x10 == 0);
-    CHECK(ecu.knock_count == 12 && ecu.ecu_error_count == 6 && ecu.ecu_lost_sync_count == 4);
+    CHECK(ecu.aero_sequence == static_cast<uint8_t>(3000));
 }
 } // namespace
 

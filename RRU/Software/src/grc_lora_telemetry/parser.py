@@ -1,24 +1,23 @@
-"""CSV parser for the new LoRa RX serial dump.
+"""CSV parser for the GRC26 LoRa receiver serial stream.
 
 The receiver firmware prints a CSV header and one row per received telemetry
-packet. This parser accepts that stream and returns typed dictionaries suitable
-for Foxglove and MCAP logging.
+packet. This parser validates the current schema and returns typed measurements
+for the telemetry software's CSV logging path.
 """
 
 from __future__ import annotations
 
 import csv
+import math
 from dataclasses import dataclass
 from typing import Iterable
 
-from .schema import CSV_HEADER, FLOAT_FIELDS, INT_FIELDS, STRING_FIELDS, TOPICS
+from .schema import CSV_HEADER, FLOAT_FIELDS, INT_FIELDS, PACKET_FIELDS, SCHEMA_VERSION, STRING_FIELDS, is_current_header
 
 
 @dataclass(slots=True)
 class ParsedTelemetry:
     packet_type: str
-    topic: str
-    timestamp_ns: int
     payload: dict
 
 
@@ -27,6 +26,7 @@ class TelemetryCsvParser:
 
     def __init__(self) -> None:
         self.header: list[str] = CSV_HEADER.copy()
+        self.header_valid = True
 
     def parse_line(self, raw_line: bytes | str) -> ParsedTelemetry | None:
         if isinstance(raw_line, bytes):
@@ -37,13 +37,15 @@ class TelemetryCsvParser:
         if not line:
             return None
 
-        # Ignore firmware boot/debug logs without failing the server.
+        # Ignore firmware boot/debug logs without interrupting logging.
         if not self._looks_like_csv(line):
             return None
 
         try:
-            row = next(csv.reader([line]))
+            row = next(csv.reader([line], strict=True))
         except csv.Error:
+            if line.startswith("event,"):
+                self.header_valid = False
             return None
 
         if not row:
@@ -51,46 +53,41 @@ class TelemetryCsvParser:
 
         # Receiver prints a header once. Accept it and continue.
         if row[0] == "event":
-            self.header = [field.strip() for field in row]
+            header = [field.strip() for field in row]
+            self.header_valid = is_current_header(header)
+            if self.header_valid:
+                self.header = header
             return None
 
         # Ignore malformed packet rows.
         if row[0] != "rx_packet":
             return None
 
-        # Pad/truncate to match the header, so old/new firmware revisions do not
-        # immediately crash the bridge when fields are added or removed.
-        if len(row) < len(self.header):
-            row = row + [""] * (len(self.header) - len(row))
-        elif len(row) > len(self.header):
-            row = row[: len(self.header)]
+        # A late serial connection may use the current fixed header. After an
+        # incompatible header, require a valid one before interpreting more rows.
+        if not self.header_valid or len(row) != len(CSV_HEADER):
+            return None
 
         raw = dict(zip(self.header, row))
         typed = self._convert_row(raw)
-
-        packet_type = str(typed.get("packet_type") or "").upper()
-        if packet_type not in TOPICS:
+        if typed.get("schema_version") != SCHEMA_VERSION:
             return None
 
-        topic, fields = TOPICS[packet_type]
+        packet_type = str(typed.get("packet_type") or "").upper()
+        if packet_type not in PACKET_FIELDS:
+            return None
 
-        # Foxglove does not like null values when the schema says "number" or
-        # "string". Keep only fields that have real values.
+        fields = PACKET_FIELDS[packet_type]
+
+        # Preserve missing measurements as absent values, never false zeroes.
         payload = {
             field: typed.get(field)
             for field in fields
             if typed.get(field) is not None
         }
 
-        # Force foxglove_server.py to use current host wall-clock time.
-        # The original rx_ms value is still included in the payload, so you can
-        # plot/debug it if needed.
-        timestamp_ns = 0
-
         return ParsedTelemetry(
             packet_type=packet_type,
-            topic=topic,
-            timestamp_ns=timestamp_ns,
             payload=payload,
         )
 
@@ -121,27 +118,24 @@ class TelemetryCsvParser:
                 out[key] = _parse_float(value)
                 continue
 
-            # Unknown fields are preserved as strings so firmware can add fields
-            # without breaking the bridge.
-            out[key] = value
-
-        # Numeric aliases for bitfields. These are easier to plot/filter in Foxglove.
-        out["alert_flags"] = _parse_hex_or_none(str(out.get("alert_flags_hex") or ""))
-        out["status_bits"] = _parse_hex_or_none(str(out.get("status_bits_hex") or ""))
+        # Numeric aliases let consumers inspect the packet validity bitfields.
+        for field in ("alert_flags", "status_bits", "received_mask", "fresh_mask"):
+            out[field] = _parse_hex_or_none(str(out.get(f"{field}_hex") or ""))
 
         return out
 
 
 def _parse_int(value: str) -> int | None:
     try:
-        return int(value, 0)
+        return int(value, 16 if value.lower().startswith(("0x", "+0x", "-0x")) else 10)
     except ValueError:
         return None
 
 
 def _parse_float(value: str) -> float | None:
     try:
-        return float(value)
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else None
     except ValueError:
         return None
 

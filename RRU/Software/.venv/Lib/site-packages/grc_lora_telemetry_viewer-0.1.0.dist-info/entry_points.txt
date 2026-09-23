@@ -1,3 +1,2 @@
 [console_scripts]
 grc-lora-csv = grc_lora_telemetry.csv_logger:cli
-grc-lora-foxglove = grc_lora_telemetry.foxglove_server:cli

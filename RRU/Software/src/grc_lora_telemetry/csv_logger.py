@@ -1,7 +1,4 @@
-"""Tiny serial CSV logger for the RX board.
-
-Use this when you only want a CSV file and do not need Foxglove/MCAP.
-"""
+"""Read the RRU serial stream, validate telemetry, and write CSV recordings."""
 
 from __future__ import annotations
 
@@ -9,22 +6,49 @@ import argparse
 import csv
 import sys
 from pathlib import Path
+from typing import TextIO
 
 import serial
 
-from .schema import CSV_HEADER
+from .parser import TelemetryCsvParser
+
+
+class TelemetryCsvWriter:
+    """Record complete rows together with the header that actually describes them."""
+
+    def __init__(self, output: TextIO) -> None:
+        self.output = output
+        self.writer = csv.writer(output)
+        self.header: list[str] | None = None
+        self.parser = TelemetryCsvParser()
+
+    def write_line(self, line: str) -> list[str] | None:
+        line = line.strip()
+        parsed = self.parser.parse_line(line)
+        if line.startswith("event,") and self.parser.header_valid:
+            self._write_header(self.parser.header)
+            return None
+        if parsed is None:
+            return None
+        self._write_header(self.parser.header)
+        row = next(csv.reader([line], strict=True))
+        self.writer.writerow(row)
+        self.output.flush()
+        return row
+
+    def _write_header(self, header: list[str]) -> None:
+        if self.header != header:
+            self.header = header.copy()
+            self.writer.writerow(header)
+            self.output.flush()
 
 
 def run(args: argparse.Namespace) -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    active_header = CSV_HEADER.copy()
-
     with serial.Serial(args.serial_port, args.baud, timeout=1) as ser, output_path.open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(active_header)
-        f.flush()
+        writer = TelemetryCsvWriter(f)
 
         print(f"[serial] logging {args.serial_port} at {args.baud} to {output_path}")
 
@@ -37,31 +61,11 @@ def run(args: argparse.Namespace) -> None:
             if not line:
                 continue
 
-            if line.startswith("event,"):
-                # The firmware's header is the source of truth once it appears.
-                active_header = next(csv.reader([line]))
-                continue
-
-            if not line.startswith("rx_packet,"):
-                if args.verbose:
+            row = writer.write_line(line)
+            if row is None:
+                if args.verbose and not line.startswith("event,"):
                     print(f"[ignored] {line}", file=sys.stderr)
-                continue
-
-            try:
-                row = next(csv.reader([line]))
-            except csv.Error:
-                if args.verbose:
-                    print(f"[bad csv] {line}", file=sys.stderr)
-                continue
-
-            if len(row) < len(active_header):
-                row = row + [""] * (len(active_header) - len(row))
-            elif len(row) > len(active_header):
-                row = row[: len(active_header)]
-
-            writer.writerow(row)
-            f.flush()
-            if args.print_rows:
+            elif args.print_rows:
                 print(",".join(row))
 
 

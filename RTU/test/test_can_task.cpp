@@ -50,7 +50,7 @@ void resetTask()
     telemetrySeq = 0;
     lastFastTxMs = 0;
     lastSlowTxMs = 0;
-    lastPowertrainTxMs = 0;
+    lastSensorsTxMs = 0;
     mockNowMs = 0;
     installCalls = 0;
     startCalls = 0;
@@ -94,13 +94,13 @@ uint16_t packetSequence(const TelemetryPacket& packet)
 {
     switch (packet.type) {
     case TELEMETRY_PACKET_FAST:
-        return packet.data.fast_v2.seq;
+        return packet.data.fast.seq;
     case TELEMETRY_PACKET_SLOW:
-        return packet.data.slow_v2.seq;
+        return packet.data.slow.seq;
     case TELEMETRY_PACKET_EVENT:
-        return packet.data.event_v2.seq;
-    case TELEMETRY_PACKET_POWERTRAIN:
-        return packet.data.powertrain_v2.seq;
+        return packet.data.event.seq;
+    case TELEMETRY_PACKET_SENSORS:
+        return packet.data.sensors.seq;
     default:
         CHECK(false);
         return 0;
@@ -124,8 +124,11 @@ void testEmptyStateAndInvalidFrames()
     MockQueue queue;
     mockNowMs = 6000;
     sendPeriodicPacketsIfDue(&queue);
-    CHECK(queue.packets.empty());
-    CHECK(telemetrySeq == 0);
+    CHECK(queue.packets.size() == 3);
+    CHECK(telemetrySeq == 3);
+    CHECK(queue.packets[0].data.fast.received_mask == 0);
+    CHECK(queue.packets[1].data.slow.received_mask == 0);
+    CHECK(queue.packets[2].data.sensors.received_mask == 0);
     CHECK(!decodeCanData(nullptr));
 
     auto unknown = frame(0x123);
@@ -146,8 +149,8 @@ void testEmptyStateAndInvalidFrames()
     CHECK(ecu.received_mask == 0);
     CHECK(ecu.lastCanRxMs == 0);
     sendPeriodicPacketsIfDue(&queue);
-    CHECK(queue.attempts == 0);
-    CHECK(telemetryReceiveWaitTicks() == portMAX_DELAY);
+    CHECK(queue.attempts == 3);
+    CHECK(telemetryReceiveWaitTicks() == 20);
 }
 
 void testTaskPipelineAndDriverConfiguration()
@@ -169,14 +172,13 @@ void testTaskPipelineAndDriverConfiguration()
     CHECK(deleteCalls == 0);
     CHECK(delayTicks.size() == 1);
     CHECK(delayTicks[0] == CAN_TASK_PERIOD_MS);
-    CHECK(queue.packets.size() == 1);
-    const auto& packet = queue.packets[0];
+    CHECK(!queue.packets.empty());
+    const auto& packet = queue.packets[queue.packets.size() - 2];
     CHECK(packet.type == TELEMETRY_PACKET_FAST);
-    CHECK(packet.data.fast_v2.ms == 1000);
-    CHECK(packet.data.fast_v2.seq == 0);
-    CHECK(packet.data.fast_v2.vehicle_speed_kph_x10 == 1234);
-    CHECK(packet.data.fast_v2.received_mask == TelemetryV2::SOURCE_522);
-    CHECK(packet.data.fast_v2.fresh_mask == TelemetryV2::SOURCE_522);
+    CHECK(packet.data.fast.ms == 1000);
+    CHECK(packet.data.fast.vehicle_speed_kph_x10 == 1234);
+    CHECK(packet.data.fast.received_mask == TelemetryProtocol::SOURCE_522);
+    CHECK(packet.data.fast.fresh_mask == TelemetryProtocol::SOURCE_522);
     CHECK(ecu.lastCanRxMs == 1000);
 }
 
@@ -193,18 +195,18 @@ void testPeriodicBoundariesAndNoCatchUpBurst()
         CHECK(queue.packets.size() == before);
         mockNowMs = due;
         sendPeriodicPacketsIfDue(&queue);
-        const size_t expected = before + 1 + (due % 2000 == 0) + (due == 6000);
+        const size_t expected = before + 1 + (due % 2000 == 0) + (due % 200 == 0);
         CHECK(queue.packets.size() == expected);
         sendPeriodicPacketsIfDue(&queue);
         CHECK(queue.packets.size() == expected);
     }
     CHECK(packetCount(queue, TELEMETRY_PACKET_FAST) == 300);
     CHECK(packetCount(queue, TELEMETRY_PACKET_SLOW) == 3);
-    CHECK(packetCount(queue, TELEMETRY_PACKET_POWERTRAIN) == 1);
-    CHECK(queue.packets.back().data.powertrain_v2.ms == 6000);
-    CHECK(queue.packets.back().data.powertrain_v2.fuel_inj_pulse_width_ms_x100 == 125);
-    CHECK(queue.packets.back().data.powertrain_v2.fresh_mask == 0);
-    CHECK(queue.packets.back().data.powertrain_v2.received_mask == TelemetryV2::SOURCE_522);
+    CHECK(packetCount(queue, TELEMETRY_PACKET_SENSORS) == 30);
+    CHECK(queue.packets.back().data.sensors.ms == 6000);
+    CHECK(queue.packets.back().data.sensors.aero_pressure_1_pa == 0);
+    CHECK(queue.packets.back().data.sensors.fresh_mask == 0);
+    CHECK(queue.packets.back().data.sensors.received_mask == TelemetryProtocol::SOURCE_522);
     for (size_t i = 0; i < queue.packets.size(); ++i) {
         CHECK(packetSequence(queue.packets[i]) == i);
     }
@@ -215,7 +217,7 @@ void testPeriodicBoundariesAndNoCatchUpBurst()
     CHECK(queue.packets.size() == beforeGap + 3);
     CHECK(lastFastTxMs == 18000);
     CHECK(lastSlowTxMs == 18000);
-    CHECK(lastPowertrainTxMs == 18000);
+    CHECK(lastSensorsTxMs == 18000);
     CHECK(telemetryReceiveWaitTicks() == 13);
     sendPeriodicPacketsIfDue(&queue);
     CHECK(queue.packets.size() == beforeGap + 3);
@@ -225,13 +227,13 @@ void testPeriodicBoundariesAndNoCatchUpBurst()
     mockNowMs = 18020;
     sendPeriodicPacketsIfDue(&queue);
     CHECK(queue.packets.size() == beforeGap + 4);
-    CHECK(queue.packets.back().data.fast_v2.ms == 18020);
+    CHECK(queue.packets.back().data.fast.ms == 18020);
 }
 
 void testSchedulerClockRollover()
 {
-    const uint32_t periods[] = {20, 2000, 6000};
-    const uint8_t types[] = {TELEMETRY_PACKET_FAST, TELEMETRY_PACKET_SLOW, TELEMETRY_PACKET_POWERTRAIN};
+    const uint32_t periods[] = {20, 2000, 200};
+    const uint8_t types[] = {TELEMETRY_PACKET_FAST, TELEMETRY_PACKET_SLOW, TELEMETRY_PACKET_SENSORS};
     const uint32_t baseline = UINT32_MAX - 100;
     for (size_t i = 0; i < 3; ++i) {
         resetTask();
@@ -240,7 +242,7 @@ void testSchedulerClockRollover()
         decode(frame(0x522));
         lastFastTxMs = baseline;
         lastSlowTxMs = baseline;
-        lastPowertrainTxMs = baseline;
+        lastSensorsTxMs = baseline;
         mockNowMs = baseline + periods[i] - 1;
         sendPeriodicPacketsIfDue(&queue);
         CHECK(packetCount(queue, types[i]) == 0);
@@ -256,7 +258,7 @@ void testSchedulerClockRollover()
     decode(frame(0x522));
     lastFastTxMs = mockNowMs;
     lastSlowTxMs = mockNowMs;
-    lastPowertrainTxMs = mockNowMs;
+    lastSensorsTxMs = mockNowMs;
     CHECK(telemetryReceiveWaitTicks() == 20);
     mockNowMs = 9;
     CHECK(telemetryReceiveWaitTicks() == 1);
@@ -277,28 +279,28 @@ void testFullQueueDropsNewestAndConsumesSequence()
     queue.capacity = 1;
     TelemetryPacket older = {};
     older.type = TELEMETRY_PACKET_FAST;
-    older.data.fast_v2.seq = 777;
-    older.data.fast_v2.vehicle_speed_kph_x10 = 2222;
+    older.data.fast.seq = 777;
+    older.data.fast.vehicle_speed_kph_x10 = 2222;
     queue.packets.push_back(older);
-    mockNowMs = 500;
+    mockNowMs = 100;
     decode(frame(0x522, 125, 230, 0, 1234));
     sendPeriodicPacketsIfDue(&queue);
     CHECK(queue.attempts == 1);
     CHECK(queue.packets.size() == 1);
-    CHECK(queue.packets[0].data.fast_v2.seq == 777);
-    CHECK(queue.packets[0].data.fast_v2.vehicle_speed_kph_x10 == 2222);
+    CHECK(queue.packets[0].data.fast.seq == 777);
+    CHECK(queue.packets[0].data.fast.vehicle_speed_kph_x10 == 2222);
     CHECK(telemetrySeq == 1);
-    CHECK(lastFastTxMs == 500);
+    CHECK(lastFastTxMs == 100);
 
     queue.packets.clear();
-    mockNowMs = 519;
+    mockNowMs = 119;
     sendPeriodicPacketsIfDue(&queue);
     CHECK(queue.attempts == 1);
-    mockNowMs = 520;
+    mockNowMs = 120;
     sendPeriodicPacketsIfDue(&queue);
     CHECK(queue.packets.size() == 1);
-    CHECK(queue.packets[0].data.fast_v2.seq == 1);
-    CHECK(queue.packets[0].data.fast_v2.vehicle_speed_kph_x10 == 1234);
+    CHECK(queue.packets[0].data.fast.seq == 1);
+    CHECK(queue.packets[0].data.fast.vehicle_speed_kph_x10 == 1234);
     CHECK(!sendTelemetryPacket(nullptr, older));
     CHECK(queue.attempts == 2);
 }
@@ -327,10 +329,10 @@ void testTaskDeadlinesWithIrregularAndInvalidCan()
     const uint16_t expectedRpm[] = {1000, 2000, 2000, 3000, 3000};
     for (size_t i = 0; i < queue.packets.size(); ++i) {
         CHECK(queue.packets[i].type == TELEMETRY_PACKET_FAST);
-        CHECK(queue.packets[i].data.fast_v2.ms == 20 * (i + 1));
-        CHECK(queue.packets[i].data.fast_v2.rpm == expectedRpm[i]);
+        CHECK(queue.packets[i].data.fast.ms == 20 * (i + 1));
+        CHECK(queue.packets[i].data.fast.rpm == expectedRpm[i]);
     }
-    const std::vector<TickType_t> expectedWaits = {portMAX_DELAY, 15, 7, 20, 13, 20, 1, 20, 18, 20, 20};
+    const std::vector<TickType_t> expectedWaits = {20, 15, 7, 20, 13, 20, 1, 20, 18, 20, 20};
     CHECK(receiveWaitTicks == expectedWaits);
     CHECK(delayTicks.empty()); // Deadline timeouts never add the old idle delay.
 }
@@ -348,18 +350,18 @@ void testCanSilenceKeepsCadenceAndExpiresFreshness()
     CHECK(delayTicks.empty());
     CHECK(packetCount(queue, TELEMETRY_PACKET_FAST) == 301);
     CHECK(packetCount(queue, TELEMETRY_PACKET_SLOW) == 3);
-    CHECK(packetCount(queue, TELEMETRY_PACKET_POWERTRAIN) == 1);
+    CHECK(packetCount(queue, TELEMETRY_PACKET_SENSORS) == 30);
     CHECK(ecu.lastCanRxMs == 0);
     for (const auto& packet : queue.packets) {
         if (packet.type != TELEMETRY_PACKET_FAST) {
             continue;
         }
-        const auto& fast = packet.data.fast_v2;
+        const auto& fast = packet.data.fast;
         CHECK(fast.vehicle_speed_kph_x10 == 1234);
-        CHECK(fast.received_mask == TelemetryV2::SOURCE_522);
-        CHECK(fast.fresh_mask == (fast.ms <= 2000 ? TelemetryV2::SOURCE_522 : 0));
+        CHECK(fast.received_mask == TelemetryProtocol::SOURCE_522);
+        CHECK(fast.fresh_mask == (fast.ms <= 2000 ? TelemetryProtocol::SOURCE_522 : 0));
     }
-    CHECK(receiveWaitTicks.front() == portMAX_DELAY);
+    CHECK(receiveWaitTicks.front() == 20);
     for (size_t i = 1; i < receiveWaitTicks.size(); ++i) {
         CHECK(receiveWaitTicks[i] == 20);
     }
@@ -370,29 +372,57 @@ void testEventBaselineAdvancesWhenQueueDrops()
     resetTask();
     MockQueue queue;
     queue.capacity = 0;
-    decode(frame(0x528, 100, 5, 7, 2));
+    decode(frame(0x602, 0, 0, 7));
     sendEventPacketIfNeeded(&queue);
     CHECK(queue.attempts == 0);
-    CHECK(eventTracker.knock_count == 7);
-    decode(frame(0x528, 100, 5, 8, 2));
+    decode(frame(0x602, 1, 0, 8));
     sendEventPacketIfNeeded(&queue);
     CHECK(queue.attempts == 1);
     CHECK(queue.packets.empty());
-    CHECK(eventTracker.knock_count == 8);
+    CHECK(eventTracker.aero_node_state == 1);
     CHECK(telemetrySeq == 1);
 
     queue.capacity = 24;
     sendEventPacketIfNeeded(&queue);
     CHECK(queue.attempts == 1);
-    decode(frame(0x528, 100, 5, 9, 2));
+    decode(frame(0x602, 1, 1, 9));
     sendEventPacketIfNeeded(&queue);
     CHECK(queue.packets.size() == 1);
     CHECK(queue.packets[0].type == TELEMETRY_PACKET_EVENT);
-    CHECK(queue.packets[0].data.event_v2.seq == 1);
-    CHECK(queue.packets[0].data.event_v2.knock_count == 9);
-    CHECK(queue.packets[0].data.event_v2.alert_flags == TelemetryV2::KNOCK_COUNT_INCREMENTED);
+    CHECK(queue.packets[0].data.event.seq == 1);
+    CHECK(queue.packets[0].data.event.aero_fault_flags == 1);
+    CHECK(queue.packets[0].data.event.alert_flags == TelemetryProtocol::AERO_STATUS_CHANGED);
     sendEventPacketIfNeeded(&queue);
     CHECK(queue.attempts == 2);
+}
+
+void testStartupSilenceAndOnlyOptionalSensor()
+{
+    resetTask();
+    MockQueue queue;
+    queue.capacity = 400;
+    // No producer has ever sent a frame: still send heartbeats and never wait indefinitely.
+    for (uint32_t atMs = 20; atMs <= 2020; atMs += 20) {
+        receiveSteps.push_back({atMs, {}, ESP_ERR_TIMEOUT});
+    }
+    runScriptedTask(queue);
+    CHECK(packetCount(queue, TELEMETRY_PACKET_FAST) == 101);
+    CHECK(packetCount(queue, TELEMETRY_PACKET_SLOW) == 1);
+    CHECK(packetCount(queue, TELEMETRY_PACKET_SENSORS) == 10);
+    for (const auto& packet : queue.packets) {
+        CHECK(packet.data.fast.received_mask == 0);
+        CHECK(packet.data.fast.fresh_mask == 0);
+    }
+    for (auto wait : receiveWaitTicks) CHECK(wait <= 20);
+    CHECK(delayTicks.empty());
+    resetTask();
+    queue.packets.clear();
+    mockNowMs = 200;
+    decode(frame(0x620, 1, 2, 3, 4)); // GPS alone, no ECU or IMU required.
+    sendPeriodicPacketsIfDue(&queue);
+    CHECK(queue.packets.size() == 2);
+    CHECK(queue.packets[0].data.fast.received_mask == TelemetryProtocol::SOURCE_620);
+    CHECK(queue.packets[1].data.sensors.gps_latitude_deg_x1e7 == 0x00020001);
 }
 
 void testDriverInstallFailureStopsTask()
@@ -463,6 +493,7 @@ esp_err_t twai_start()
 
 esp_err_t twai_receive(twai_message_t* message, uint32_t waitTicks)
 {
+    CHECK(waitTicks <= 20);
     receiveWaitTicks.push_back(waitTicks);
     if (receiveIndex == receiveSteps.size()) {
         throw TaskStopped{};
@@ -483,7 +514,8 @@ int main()
     testTaskDeadlinesWithIrregularAndInvalidCan();
     testCanSilenceKeepsCadenceAndExpiresFreshness();
     testEventBaselineAdvancesWhenQueueDrops();
+    testStartupSilenceAndOnlyOptionalSensor();
     testDriverInstallFailureStopsTask();
-    std::cout << "CAN task integration tests passed (9 groups).\n";
+    std::cout << "CAN task integration tests passed (10 groups).\n";
     return 0;
 }

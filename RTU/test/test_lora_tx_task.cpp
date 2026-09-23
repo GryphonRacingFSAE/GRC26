@@ -82,7 +82,7 @@ int16_t LoRaApiInit(bool txRole)
 int16_t LoRaApiStartTransmit(const uint8_t* payload, size_t len)
 {
     CHECK(payload != nullptr);
-    CHECK(len > 0 && len <= TelemetryV2::MAX_RADIO_PAYLOAD);
+    CHECK(len > 0 && len <= TelemetryProtocol::MAX_RADIO_PAYLOAD);
     startTimes.push_back(clockMs);
     sentFrames.emplace_back(payload, payload + len);
     return txStartResult;
@@ -153,8 +153,8 @@ TelemetryPacket packet(uint8_t type, uint16_t sequence = 42)
     TelemetryPacket result = {};
     result.type = type;
     EcuTelemetryState ecu = {};
-    populateFastPacket(result.data.fast_v2, ecu, 123456, sequence);
-    // All V2 bodies share the populated ten-byte header; other fields are zero.
+    populateFastPacket(result.data.fast, ecu, 123456, sequence);
+    // All bodies share the populated ten-byte header; other fields are zero.
     return result;
 }
 bool logged(const char* text)
@@ -170,17 +170,19 @@ void testSerializerAndGuard()
 {
     reset();
     CHECK(LORA_TX_GAP_MS == 3);
-    const size_t lengths[] = {35, 39, 53, 65};
-    for (uint8_t type = 1; type <= 4; ++type) {
+    const size_t lengths[] = {35, 31, 33, 59};
+    const uint8_t types[] = {1, 2, 3, 5};
+    for (size_t index = 0; index < 4; ++index) {
+        const uint8_t type = types[index];
         const TelemetryPacket value = packet(type, type);
         txResults = {LORA_API_BUSY, LORA_API_BUSY, RADIOLIB_ERR_NONE};
         const uint32_t started = clockMs;
         transmitOnePacket(value);
-        CHECK(sentFrames.size() == type);
+        CHECK(sentFrames.size() == index + 1);
         const auto& frame = sentFrames.back();
-        CHECK(frame.size() == lengths[type - 1]);
-        CHECK(frame[0] == 'T' && frame[1] == 'M' && frame[2] == 2 && frame[3] == type);
-        CHECK(frame[4] == lengths[type - 1] - 7);
+        CHECK(frame.size() == lengths[index]);
+        CHECK(frame[0] == 'T' && frame[1] == 'M' && frame[2] == 3 && frame[3] == type);
+        CHECK(frame[4] == lengths[index] - 7);
         CHECK(frame[5] == 0x40 && frame[6] == 0xE2 && frame[7] == 1 && frame[8] == 0);
         CHECK(frame[9] == type && frame[10] == 0);
         const uint16_t crc = crc16_ccitt(frame.data(), frame.size() - 2);
@@ -269,25 +271,8 @@ void testRateLimitedLogging()
     CHECK(Serial.lines.size() == 2 && logged("failed: -5"));
     CHECK(lastTxReportMs == 500); // Error reports are never suppressed by success throttling.
 }
-void testLegacyReceiveAndTaskEntry()
+void testTaskEntry()
 {
-    reset();
-    TelemetryFastPacket legacy = {};
-    legacy.rpm = 4321;
-    receivedFrame = {'T', 'M', 1, TELEMETRY_PACKET_FAST, static_cast<uint8_t>(sizeof(legacy))};
-    const auto* body = reinterpret_cast<const uint8_t*>(&legacy);
-    receivedFrame.insert(receivedFrame.end(), body, body + sizeof(legacy));
-    const uint16_t crc = crc16_ccitt(receivedFrame.data(), receivedFrame.size());
-    receivedFrame.push_back(static_cast<uint8_t>(crc));
-    receivedFrame.push_back(static_cast<uint8_t>(crc >> 8));
-    runRxTask();
-    rxPollResult = LORA_API_BUSY;
-    runRxTask();
-    CHECK(delays.size() == 1 && delays[0] == 5);
-    rxPollResult = RADIOLIB_ERR_NONE;
-    runRxTask();
-    CHECK(rxCount == 1 && logged("rpm=4321"));
-
     reset();
     std::deque<TelemetryPacket> queue{packet(1)};
     LoRaTaskParameters parameters{&queue};
@@ -316,6 +301,60 @@ void testLegacyReceiveAndTaskEntry()
     }
     CHECK(rejected && sentFrames.empty() && rxStartCalls == 0);
 }
+void testReceive()
+{
+    for (uint8_t type : {1, 2, 3, 5}) {
+        reset();
+        uint8_t output[96];
+        size_t length = 0;
+        CHECK(buildTelemetryRadioPayload(packet(type), output, sizeof(output), &length));
+        receivedFrame.assign(output, output + length);
+        runRxTask();
+        rxPollResult = LORA_API_BUSY;
+        runRxTask();
+        CHECK(delays.size() == 1 && delays.back() == 5);
+        rxPollResult = RADIOLIB_ERR_NONE;
+        runRxTask();
+        CHECK(rxCount == 1 && logged("seq=42") && logged("received=0x0 fresh=0x0"));
+        CHECK(logged("body=") && !logged("invalid payload"));
+        receivedFrame.back() ^= 1;
+        runRxTask();
+        runRxTask();
+        CHECK(logged("invalid payload"));
+    }
+}
+void testRejectUnsupportedProtocol()
+{
+    for (uint8_t type : {1, 2, 3, 5}) {
+        uint8_t output[96];
+        size_t length = 0;
+        CHECK(buildTelemetryRadioPayload(packet(type), output, sizeof(output), &length));
+        for (uint8_t version : {0, 1, 2, 4, 255}) {
+            output[2] = version;
+            const uint16_t crc = crc16_ccitt(output, length - 2);
+            output[length - 2] = static_cast<uint8_t>(crc);
+            output[length - 1] = static_cast<uint8_t>(crc >> 8);
+            uint8_t decodedType = 99;
+            const uint8_t* decodedBody = output;
+            size_t decodedLength = 999;
+            CHECK(!validateRadioPayload(output, length, &decodedType, &decodedBody, &decodedLength));
+            CHECK(decodedType == 0 && decodedBody == nullptr && decodedLength == 0);
+        }
+    }
+    for (uint8_t type : {0, 4, 255}) {
+        uint8_t output[96];
+        size_t length = 0;
+        CHECK(buildTelemetryRadioPayload(packet(1), output, sizeof(output), &length));
+        output[3] = type;
+        const uint16_t crc = crc16_ccitt(output, length - 2);
+        output[length - 2] = static_cast<uint8_t>(crc);
+        output[length - 1] = static_cast<uint8_t>(crc >> 8);
+        uint8_t decodedType = 0;
+        const uint8_t* decodedBody = nullptr;
+        size_t decodedLength = 0;
+        CHECK(!validateRadioPayload(output, length, &decodedType, &decodedBody, &decodedLength));
+    }
+}
 } // namespace
 
 int main()
@@ -323,7 +362,9 @@ int main()
     testSerializerAndGuard();
     testQueueAndErrors();
     testRateLimitedLogging();
-    testLegacyReceiveAndTaskEntry();
+    testTaskEntry();
+    testReceive();
+    testRejectUnsupportedProtocol();
     std::printf("LoRa task integration: %u checks passed (LORA_ROLE_TX=%d)\n", checks, LORA_ROLE_TX);
     return EXIT_SUCCESS;
 }

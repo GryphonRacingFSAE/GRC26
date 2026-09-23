@@ -21,7 +21,7 @@ static TelemetryEventTracker eventTracker = {};
 static uint16_t telemetrySeq = 0;
 static uint32_t lastFastTxMs = 0;
 static uint32_t lastSlowTxMs = 0;
-static uint32_t lastPowertrainTxMs = 0;
+static uint32_t lastSensorsTxMs = 0;
 
 #if !TELEMETRY_MOCK_DATA
 static bool initCAN()
@@ -66,7 +66,7 @@ static void sendFastPacket(QueueHandle_t queue, uint32_t now)
 {
     TelemetryPacket packet = {};
     packet.type = TELEMETRY_PACKET_FAST;
-    populateFastPacket(packet.data.fast_v2, ecu, now, telemetrySeq++);
+    populateFastPacket(packet.data.fast, ecu, now, telemetrySeq++);
     sendTelemetryPacket(queue, packet);
 }
 
@@ -74,15 +74,15 @@ static void sendSlowPacket(QueueHandle_t queue, uint32_t now)
 {
     TelemetryPacket packet = {};
     packet.type = TELEMETRY_PACKET_SLOW;
-    populateSlowPacket(packet.data.slow_v2, ecu, now, telemetrySeq++);
+    populateSlowPacket(packet.data.slow, ecu, now, telemetrySeq++);
     sendTelemetryPacket(queue, packet);
 }
 
-static void sendPowertrainPacket(QueueHandle_t queue, uint32_t now)
+static void sendSensorsPacket(QueueHandle_t queue, uint32_t now)
 {
     TelemetryPacket packet = {};
-    packet.type = TELEMETRY_PACKET_POWERTRAIN;
-    populatePowertrainPacket(packet.data.powertrain_v2, ecu, now, telemetrySeq++);
+    packet.type = TELEMETRY_PACKET_SENSORS;
+    populateSensorsPacket(packet.data.sensors, ecu, now, telemetrySeq++);
     sendTelemetryPacket(queue, packet);
 }
 
@@ -94,15 +94,13 @@ static void sendEventPacketIfNeeded(QueueHandle_t queue)
     }
     TelemetryPacket packet = {};
     packet.type = TELEMETRY_PACKET_EVENT;
-    populateEventPacket(packet.data.event_v2, ecu, millis(), telemetrySeq++, flags);
+    populateEventPacket(packet.data.event, ecu, millis(), telemetrySeq++, flags);
     sendTelemetryPacket(queue, packet);
 }
 
 static void sendPeriodicPacketsIfDue(QueueHandle_t queue)
 {
-    if (!ecu.hasCanData) {
-        return;
-    }
+    // An empty-mask heartbeat starts immediately; no CAN source is mandatory.
     const uint32_t now = millis();
     if ((uint32_t)(now - lastFastTxMs) >= TELEMETRY_FAST_PERIOD_MS) {
         sendFastPacket(queue, now);
@@ -113,10 +111,10 @@ static void sendPeriodicPacketsIfDue(QueueHandle_t queue)
         sendSlowPacket(queue, now);
         lastSlowTxMs += ((uint32_t)(now - lastSlowTxMs) / TELEMETRY_SLOW_PERIOD_MS) * TELEMETRY_SLOW_PERIOD_MS;
     }
-    if ((uint32_t)(now - lastPowertrainTxMs) >= TelemetryV2::POWERTRAIN_PERIOD_MS) {
-        sendPowertrainPacket(queue, now);
-        lastPowertrainTxMs += ((uint32_t)(now - lastPowertrainTxMs) / TelemetryV2::POWERTRAIN_PERIOD_MS) *
-                              TelemetryV2::POWERTRAIN_PERIOD_MS;
+    if ((uint32_t)(now - lastSensorsTxMs) >= TelemetryProtocol::SENSORS_PERIOD_MS) {
+        sendSensorsPacket(queue, now);
+        lastSensorsTxMs += ((uint32_t)(now - lastSensorsTxMs) / TelemetryProtocol::SENSORS_PERIOD_MS) *
+                              TelemetryProtocol::SENSORS_PERIOD_MS;
     }
 }
 
@@ -128,18 +126,16 @@ static uint32_t timeUntilPacket(uint32_t now, uint32_t lastDeadline, uint32_t pe
 
 static TickType_t telemetryReceiveWaitTicks()
 {
-    if (!ecu.hasCanData) {
-        return portMAX_DELAY;
-    }
+    // Always bounded by the next telemetry deadline, including before the first CAN frame.
     const uint32_t now = millis();
     uint32_t waitMs = timeUntilPacket(now, lastFastTxMs, TELEMETRY_FAST_PERIOD_MS);
     const uint32_t slowWaitMs = timeUntilPacket(now, lastSlowTxMs, TELEMETRY_SLOW_PERIOD_MS);
-    const uint32_t powertrainWaitMs = timeUntilPacket(now, lastPowertrainTxMs, TelemetryV2::POWERTRAIN_PERIOD_MS);
+    const uint32_t sensorsWaitMs = timeUntilPacket(now, lastSensorsTxMs, TelemetryProtocol::SENSORS_PERIOD_MS);
     if (slowWaitMs < waitMs) {
         waitMs = slowWaitMs;
     }
-    if (powertrainWaitMs < waitMs) {
-        waitMs = powertrainWaitMs;
+    if (sensorsWaitMs < waitMs) {
+        waitMs = sensorsWaitMs;
     }
     if (waitMs == 0) {
         return 0;

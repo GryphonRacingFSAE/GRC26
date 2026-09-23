@@ -1,3 +1,3 @@
-"""Gryphon Racing LoRa telemetry serial parser and Foxglove bridge."""
+"""Gryphon Racing serial telemetry validation and CSV logging."""
 
 __version__ = "0.1.0"

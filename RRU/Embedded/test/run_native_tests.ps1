@@ -13,16 +13,18 @@ New-Item -ItemType Directory -Force -Path $buildDirectory | Out-Null
 # standalone checkout may provide the sender location explicitly.
 if ([string]::IsNullOrWhiteSpace($SenderRoot)) {
     $candidateSender = [IO.Path]::GetFullPath((Join-Path $repoRoot '../../RTU'))
-    if (Test-Path -LiteralPath (Join-Path $candidateSender 'include/Utils/TelemetryV2.h')) {
+    if (Test-Path -LiteralPath (Join-Path $candidateSender 'include/Utils/TelemetryProtocol.h')) {
         $SenderRoot = $candidateSender
     }
 }
 if (-not [string]::IsNullOrWhiteSpace($SenderRoot)) {
-    $senderSchema = Join-Path $SenderRoot 'include/Utils/TelemetryV2.h'
-    $receiverSchema = Join-Path $repoRoot 'include/Utils/TelemetryV2.h'
-    if ((Get-FileHash -LiteralPath $senderSchema -Algorithm SHA256).Hash -ne
-        (Get-FileHash -LiteralPath $receiverSchema -Algorithm SHA256).Hash) {
-        throw 'Receiver TelemetryV2.h differs from the RTU sender schema.'
+    foreach ($schema in @('TelemetryProtocol.h')) {
+        $senderSchema = Join-Path $SenderRoot "include/Utils/$schema"
+        $receiverSchema = Join-Path $repoRoot "include/Utils/$schema"
+        if ((Get-FileHash -LiteralPath $senderSchema -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $receiverSchema -Algorithm SHA256).Hash) {
+            throw "Receiver $schema differs from the RTU sender schema."
+        }
     }
     Write-Output 'Sender/receiver schema copies match.'
 }

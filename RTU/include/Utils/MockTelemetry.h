@@ -5,7 +5,7 @@
 #include "Telemetry.h"
 
 #if TELEMETRY_MOCK_DATA
-// Generate all supported ECU/IMU sources through the normal CAN decoder.
+// Generate all 16 ECU, AeroProbe, IMU, and GPS sources through the normal CAN decoder.
 // Measurements change once per second; receipt timestamps refresh on every call.
 void updateMockTelemetry(EcuTelemetryState& state, uint32_t nowMs);
 #endif

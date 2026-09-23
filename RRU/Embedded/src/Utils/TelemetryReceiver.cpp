@@ -26,29 +26,17 @@ uint16_t crc16Ccitt(const uint8_t* data, size_t len)
     return crc;
 }
 
-size_t bodySize(uint8_t version, uint8_t type)
+size_t bodySize(uint8_t type)
 {
-    if (version == 1) {
-        switch (type) {
-        case TELEMETRY_PACKET_FAST:
-            return sizeof(TelemetryFastPacket);
-        case TELEMETRY_PACKET_SLOW:
-            return sizeof(TelemetrySlowPacket);
-        case TELEMETRY_PACKET_EVENT:
-            return sizeof(TelemetryEventPacket);
-        default:
-            return 0;
-        }
-    }
     switch (type) {
     case TELEMETRY_PACKET_FAST:
-        return sizeof(TelemetryV2::FastPacket);
+        return sizeof(TelemetryProtocol::FastPacket);
     case TELEMETRY_PACKET_SLOW:
-        return sizeof(TelemetryV2::SlowPacket);
+        return sizeof(TelemetryProtocol::SlowPacket);
     case TELEMETRY_PACKET_EVENT:
-        return sizeof(TelemetryV2::EventPacket);
-    case TELEMETRY_PACKET_POWERTRAIN:
-        return sizeof(TelemetryV2::PowertrainPacket);
+        return sizeof(TelemetryProtocol::EventPacket);
+    case TELEMETRY_PACKET_SENSORS:
+        return sizeof(TelemetryProtocol::SensorsPacket);
     default:
         return 0;
     }
@@ -62,35 +50,33 @@ TelemetryDecodeResult decodeTelemetryRadioPayload(const uint8_t* data, size_t le
     if (data == nullptr) {
         return TelemetryDecodeResult::InvalidArgument;
     }
-    if (len < TelemetryV2::RADIO_OVERHEAD || len > TelemetryV2::MAX_RADIO_PAYLOAD) {
+    if (len < TelemetryProtocol::RADIO_OVERHEAD || len > TelemetryProtocol::MAX_RADIO_PAYLOAD) {
         return TelemetryDecodeResult::InvalidLength;
     }
     if (data[0] != 'T' || data[1] != 'M') {
         return TelemetryDecodeResult::InvalidHeader;
     }
     const uint8_t version = data[2];
-    if (version != 1 && version != TelemetryV2::VERSION) {
+    if (version != TelemetryProtocol::VERSION) {
         return TelemetryDecodeResult::UnsupportedVersion;
     }
     const uint8_t type = data[3];
-    const size_t expectedBodySize = bodySize(version, type);
+    const size_t expectedBodySize = bodySize(type);
     if (expectedBodySize == 0) {
         return TelemetryDecodeResult::UnsupportedType;
     }
-    if (data[4] != expectedBodySize || len != expectedBodySize + TelemetryV2::RADIO_OVERHEAD) {
+    if (data[4] != expectedBodySize || len != expectedBodySize + TelemetryProtocol::RADIO_OVERHEAD) {
         return TelemetryDecodeResult::InvalidLength;
     }
     if (readU16Le(data + len - 2) != crc16Ccitt(data, len - 2)) {
         return TelemetryDecodeResult::CrcMismatch;
     }
-    if (version == TelemetryV2::VERSION) {
-        // These words are common to every V2 body, at body offsets 6 and 8.
-        const uint16_t received = readU16Le(data + 5 + 6);
-        const uint16_t fresh = readU16Le(data + 5 + 8);
-        constexpr uint16_t sourceMask = (1u << TelemetryV2::SOURCE_COUNT) - 1u;
-        if ((received & ~sourceMask) != 0 || (fresh & ~received) != 0) {
-            return TelemetryDecodeResult::InvalidSourceMasks;
-        }
+    // Every body carries these common source masks at offsets 6 and 8.
+    // All 16 source bits are used; freshness must be a subset of receipt.
+    const uint16_t received = readU16Le(data + 5 + 6);
+    const uint16_t fresh = readU16Le(data + 5 + 8);
+    if ((fresh & ~received) != 0) {
+        return TelemetryDecodeResult::InvalidSourceMasks;
     }
 
     out.version = version;

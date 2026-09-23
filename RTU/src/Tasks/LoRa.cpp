@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <RadioLib.h>
-#include <string.h>
 
 #include "LoRa.h"
 #include "AssertMsg.h"
@@ -9,8 +8,6 @@
 
 static constexpr uint8_t TELEMETRY_MAGIC_0 = 'T';
 static constexpr uint8_t TELEMETRY_MAGIC_1 = 'M';
-static constexpr uint8_t TELEMETRY_VERSION = 1; // Legacy RX; TX uses TelemetryV2::VERSION.
-static constexpr size_t TELEMETRY_MAX_RADIO_PAYLOAD = 96;
 
 static uint32_t txCount = 0;
 static uint32_t lastTxReportMs = 0;
@@ -50,7 +47,8 @@ static bool validateRadioPayload(const uint8_t* data, size_t len, uint8_t* packe
         return false;
     }
 
-    if (data[0] != TELEMETRY_MAGIC_0 || data[1] != TELEMETRY_MAGIC_1 || data[2] != TELEMETRY_VERSION) {
+    if (data[0] != TELEMETRY_MAGIC_0 || data[1] != TELEMETRY_MAGIC_1 ||
+        data[2] != TelemetryProtocol::VERSION) {
         return false;
     }
 
@@ -58,6 +56,18 @@ static bool validateRadioPayload(const uint8_t* data, size_t len, uint8_t* packe
     const size_t expectedLen = 5 + declaredLen + 2;
 
     if (len != expectedLen) {
+        return false;
+    }
+
+    size_t bodySize = 0;
+    switch (data[3]) {
+    case TELEMETRY_PACKET_FAST: bodySize = sizeof(TelemetryProtocol::FastPacket); break;
+    case TELEMETRY_PACKET_SLOW: bodySize = sizeof(TelemetryProtocol::SlowPacket); break;
+    case TELEMETRY_PACKET_EVENT: bodySize = sizeof(TelemetryProtocol::EventPacket); break;
+    case TELEMETRY_PACKET_SENSORS: bodySize = sizeof(TelemetryProtocol::SensorsPacket); break;
+    default: return false;
+    }
+    if (declaredLen != bodySize) {
         return false;
     }
 
@@ -85,84 +95,28 @@ static void printPacketSummary(uint8_t type, const uint8_t* payload, size_t payl
     Serial.print(" snr=");
     Serial.println(snr);
 
-    if (type == TELEMETRY_PACKET_FAST && payloadLen == sizeof(TelemetryFastPacket)) {
-        TelemetryFastPacket p;
-        memcpy(&p, payload, sizeof(p));
-
-        Serial.print("  FAST seq=");
-        Serial.print(p.seq);
-        Serial.print(" rpm=");
-        Serial.print(p.rpm);
-        Serial.print(" tps_x10=");
-        Serial.print(p.tps_x10);
-        Serial.print(" map_x10=");
-        Serial.print(p.map_kpa_x10);
-        Serial.print(" lambda_x1000=");
-        Serial.print(p.lambda_avg_x1000);
-        Serial.print(" lambda_err_x1000=");
-        Serial.print(p.lambda_error_x1000);
-        Serial.print(" oilp_x10=");
-        Serial.print(p.oil_pressure_kpa_x10);
-        Serial.print(" fuelp_x10=");
-        Serial.print(p.fuel_pressure_kpa_x10);
-        Serial.print(" coolant_x10=");
-        Serial.print(p.coolant_temp_c_x10);
-        Serial.print(" batt_x100=");
-        Serial.print(p.battery_v_x100);
-        Serial.print(" speed_x10=");
-        Serial.print(p.vehicle_speed_kph_x10);
-        Serial.print(" gear=");
-        Serial.print(p.gear);
-        Serial.print(" status=0x");
-        Serial.println(p.status_bits, HEX);
-    } else if (type == TELEMETRY_PACKET_SLOW && payloadLen == sizeof(TelemetrySlowPacket)) {
-        TelemetrySlowPacket p;
-        memcpy(&p, payload, sizeof(p));
-
-        Serial.print("  SLOW seq=");
-        Serial.print(p.seq);
-        Serial.print(" oiltemp_x10=");
-        Serial.print(p.oil_temp_c_x10);
-        Serial.print(" iat_x10=");
-        Serial.print(p.intake_air_temp_c_x10);
-        Serial.print(" injduty_x10=");
-        Serial.print(p.fuel_inj_duty_x10);
-        Serial.print(" trim_x10=");
-        Serial.print(p.fuel_trim_total_x10);
-        Serial.print(" ecu_err=");
-        Serial.print(p.ecu_error_count);
-        Serial.print(" lost_sync=");
-        Serial.print(p.ecu_lost_sync_count);
-        Serial.print(" egt_high=");
-        Serial.print(p.egt_highest_c);
-        Serial.print(" knock_count=");
-        Serial.println(p.knock_count);
-    } else if (type == TELEMETRY_PACKET_EVENT && payloadLen == sizeof(TelemetryEventPacket)) {
-        TelemetryEventPacket p;
-        memcpy(&p, payload, sizeof(p));
-
-        Serial.print("  EVENT seq=");
-        Serial.print(p.seq);
-        Serial.print(" flags=0x");
-        Serial.print(p.alert_flags, HEX);
-        Serial.print(" status=0x");
-        Serial.print(p.status_bits, HEX);
-        Serial.print(" rpm=");
-        Serial.print(p.rpm);
-        Serial.print(" oilp_x10=");
-        Serial.print(p.oil_pressure_kpa_x10);
-        Serial.print(" fuelp_x10=");
-        Serial.print(p.fuel_pressure_kpa_x10);
-        Serial.print(" coolant_x10=");
-        Serial.print(p.coolant_temp_c_x10);
-        Serial.print(" lambda_err_x1000=");
-        Serial.println(p.lambda_error_x1000);
+    // Every validated snapshot has the same ten-byte receipt/freshness header.
+    const uint16_t sequence = static_cast<uint16_t>(payload[4]) | (static_cast<uint16_t>(payload[5]) << 8);
+    const uint16_t received = static_cast<uint16_t>(payload[6]) | (static_cast<uint16_t>(payload[7]) << 8);
+    const uint16_t fresh = static_cast<uint16_t>(payload[8]) | (static_cast<uint16_t>(payload[9]) << 8);
+    Serial.print("  seq=");
+    Serial.print(sequence);
+    Serial.print(" received=0x");
+    Serial.print(received, HEX);
+    Serial.print(" fresh=0x");
+    Serial.println(fresh, HEX);
+    // Diagnostic RX role: expose each complete body independently.
+    Serial.print("  body=");
+    for (size_t i = 10; i < payloadLen; ++i) {
+        Serial.print(payload[i], HEX);
+        Serial.print(" ");
     }
+    Serial.println("");
 }
 
 static void transmitOnePacket(const TelemetryPacket& packet)
 {
-    uint8_t radioPayload[TelemetryV2::MAX_RADIO_PAYLOAD] = {0};
+    uint8_t radioPayload[TelemetryProtocol::MAX_RADIO_PAYLOAD] = {0};
     size_t radioPayloadLen = 0;
 
     if (!buildTelemetryRadioPayload(packet, radioPayload, sizeof(radioPayload), &radioPayloadLen)) {
@@ -239,7 +193,7 @@ static void runRxTask()
         return;
     }
 
-    uint8_t buffer[TELEMETRY_MAX_RADIO_PAYLOAD] = {0};
+    uint8_t buffer[TelemetryProtocol::MAX_RADIO_PAYLOAD] = {0};
     size_t receivedLen = 0;
     const int16_t state = LoRaApiPollReceive(buffer, sizeof(buffer), &receivedLen);
 
