@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: grc-lora-telemetry-viewer
+Version: 0.1.0
+Summary: Serial telemetry validation and CSV logging for Gryphon Racing
+Requires-Python: >=3.10
