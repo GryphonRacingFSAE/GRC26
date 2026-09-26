@@ -86,10 +86,10 @@
 typedef struct {
     uint16_t rpm;
     float speed;
-    float wheelSpeed;
     float tps;
     float clt;
     float batteryVoltage;
+    uint16_t gearPos;
     float oilPressure;
     float oilTemperature;
     uint16_t bp;
