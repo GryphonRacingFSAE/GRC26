@@ -7,7 +7,7 @@
 
 LV_FONT_DECLARE(lv_font_montserrat_96);
 
-static constexpr int8_t marginX = 50;
+static constexpr int8_t marginX = -60;
 static constexpr int8_t marginY = 25;
 static constexpr int8_t CAPTION_GAP = 4;
 
@@ -21,7 +21,7 @@ void ui_clt_init() {
     lv_label_set_text(coolantTemp_label, "0");
     lv_obj_set_style_text_font(coolantTemp_label, &lv_font_montserrat_96, 0);
     lv_obj_set_style_text_color(coolantTemp_label, lv_color_white(), 0);
-    lv_obj_align(coolantTemp_label, LV_ALIGN_TOP_LEFT, marginX, marginY);  
+    lv_obj_align(coolantTemp_label, LV_ALIGN_RIGHT_MID, marginX, marginY);  
 
     lv_obj_update_layout(coolantTemp_label);
 
@@ -38,7 +38,7 @@ void ui_clt_update(const EcuData_t* data) {
     }
 
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d°C", (int)round(data->clt));
+    snprintf(buf, sizeof(buf), "%d", (int)round(data->clt));
     lv_label_set_text(coolantTemp_label, buf);
 
     if(data->clt > 115) {

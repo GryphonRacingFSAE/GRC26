@@ -42,12 +42,6 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
                 dataOut->speed = vss_raw * 0.1f;
                 break;
             }
-        case 0x523: // WheelSpeedAvgDriven
-            {
-                uint16_t wss_raw = (msg->data[3] << 8) | msg->data[2];
-                dataOut->wheelSpeed = wss_raw * 0.1f;
-                break;
-            }
         case 0x530: // Coolant Temp
             {
                 uint16_t batteryVoltage_raw = (msg->data[1] << 8) | msg->data[0];
@@ -61,9 +55,10 @@ static void DecodeCanData(const twai_message_t* msg, EcuData_t* dataOut) {
                 if(msg->data_length_code < 8) {
                     break;
                 }
-
+                uint16_t gearPos_raw = (msg->data[1] << 8) | msg->data[0];
                 uint16_t oilPressure_raw = (msg->data[5] << 8) | msg->data[4];
                 int16_t oilTemperature_raw = static_cast<int16_t>((msg->data[7] << 8) | msg->data[6]);
+                dataOut->gearPos = gearPos_raw;
                 dataOut->oilPressure = oilPressure_raw * 0.1f * 0.145038f; // Convert kPa to PSI
                 dataOut->oilTemperature = oilTemperature_raw * 0.1f;
                 break;
